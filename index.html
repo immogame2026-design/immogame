@@ -694,10 +694,22 @@ select.input{cursor:pointer;}
 
       <!-- MARKET -->
       <div class="ctab-body" id="ctab-market">
+        <!-- TRANSITION BONUS -->
+        <div style="display:flex;align-items:center;gap:12px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:12px 16px;margin-bottom:14px">
+          <div>
+            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Transition-Bonus</div>
+            <div style="font-family:'Fraunces',serif;font-size:28px;font-weight:700;color:var(--green);line-height:1" id="trans-bonus-display">8 GC</div>
+            <div style="font-size:9px;color:var(--muted2)" id="trans-bonus-sub">für zukunftssichere Gebäude beim Verkauf</div>
+          </div>
+          <div style="margin-left:auto;text-align:center">
+            <button class="btn btn-primary" onclick="rollTransitionBonus()" style="font-size:13px;padding:10px 18px">🎲 W6 würfeln</button>
+            <div style="font-size:9px;color:var(--muted);margin-top:4px" id="trans-roll-result"></div>
+          </div>
+        </div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
           <div>
             <div class="plabel" style="margin:0">Transaktionsmarkt — Runde <span id="mkt-rnd">1</span></div>
-            <div style="font-size:9px;color:var(--muted);margin-top:3px">1 Gebäude je Gruppe offen · Min. 20 GC + Überbieten</div>
+            <div style="font-size:9px;color:var(--muted);margin-top:3px">1. Kauf → 2. Verkauf · Höchstgebot gewinnt · Min. 20 GC</div>
           </div>
           <div style="display:flex;gap:7px">
             <button class="btn btn-sm" onclick="refreshMarket()">↺ Neu aufdecken</button>
@@ -706,9 +718,9 @@ select.input{cursor:pointer;}
         </div>
         <div class="market-grid" id="d-market-grid"></div>
         <div style="border-top:1px solid var(--border);padding-top:14px">
-          <div class="plabel" style="margin-bottom:8px">Verkäufe dieser Runde</div>
+          <div class="plabel" style="margin-bottom:8px">Transaktionen dieser Runde</div>
           <div class="sales-log" id="d-sales-log">
-            <div style="color:var(--muted2);font-size:11px;padding:8px">Noch keine Verkäufe</div>
+            <div style="color:var(--muted2);font-size:11px;padding:8px">Noch keine Transaktionen</div>
           </div>
         </div>
       </div>
@@ -1090,10 +1102,14 @@ const BUILDINGS=[
 ];
 const GRP_COLORS=['#4ade80','#60a5fa','#f97316','#a78bfa','#fbbf24','#f472b6','#34d399','#fb923c','#818cf8','#e879f9'];
 
+function ESG_STRATEGY_IDS(){ return ESG_STRATEGIES.map(e=>e.id); }
+
 // ── STATE ──
 let S = {
   round:1, year:2025, tempSlider:13, co2Budget:210, co2PerGroup:70,
   maxRounds:'?', phase:1, currentCard:null,
+  transitionBonus:8,          // global, rolled each round
+  esgGlobalDeck: shuffle(ESG_STRATEGY_IDS()), // global ESG deck, each card once
   groups:[], market:[], salesLog:[],
   newstickerDeck: shuffle([...NEWSTICKER]),
   klimaGDeck: shuffle([...KLIMA_G]),
@@ -1319,7 +1335,6 @@ function initDashboard(){
 function listenAsSL(){
   fbListen('game/state', state=>{
     if(!state) return;
-    const prevPhase=S.phase;
     S={...S,...state};
     renderTicker();
     renderThermo();
@@ -1330,6 +1345,12 @@ function listenAsSL(){
     renderMarket();
     updateCO2Forms();
     updateKlimaBtn();
+    renderTransBonusDisplay();
+    // Show ESG events prominently
+    if(state.lastESGEvent&&state.lastESGEvent!==S._lastShownESG){
+      S._lastShownESG=state.lastESGEvent;
+      logSys(state.lastESGEvent);
+    }
     if(state.currentCard) renderCurrentCard(state.currentCard);
   });
 }
@@ -1450,20 +1471,29 @@ function toggleTimer(){
 async function nextRound(){
   S.round++; S.year++;
   S.phase=1;
-  S.groups.forEach(g=>g.ready=false);
-  // Return unsold market to pool
-  S.market.filter(m=>!m.sold).forEach(m=>{
-    if(m.building) _marketPool.push(m.building);
+  S.groups.forEach(g=>{
+    g.ready=false;
+    g.phase3step='market';
+    g.roundCO2=0;
+    g.roundIncome=0;
+    g.drawnESG=null;
+    (g.buildings||[]).forEach(b=>{
+      b.drawnCapex=null;
+      b.capexAppliedRound=null;
+      if((b.underConstruction||0)>0) b.underConstruction--;
+    });
   });
+  (S.market||[]).filter(m=>!m.sold).forEach(m=>{if(m.building)_marketPool.push(m.building);});
   S.market=buildMarket();
   _salesLogArr=[];
   renderSalesLog();
   await fbSet('game/state',S);
-  renderTicker(); renderPhaseBar(); renderReadyBar(); renderMarket(); updateCO2Forms();
-  logSys(`─── Runde ${S.round} · Jahr ${S.year} ───`);
+  renderTicker(); renderPhaseBar(); renderReadyBar(); renderMarket(); updateCO2Forms(); renderTransBonusDisplay();
+  logSys(`─── Runde ${S.round} · Jahr ${S.year} · Transition-Bonus: ${S.transitionBonus??8} GC ───`);
   ['qc_bet','qc_fos','qc_cap','qc_red','qc_neu','qc_off'].forEach(id=>{const e=document.getElementById(id);if(e)e.value=0;});
   qTotal();
 }
+
 async function prevRound(){
   if(S.round<=1) return;
   S.round--; S.year--;
@@ -1933,118 +1963,8 @@ function listenAsGroup(){
   });
 }
 
-function renderGroupView(){
-  const g=S.groups.find(x=>x.id===myGroupId); if(!g) return;
-  document.getElementById('gv-name').textContent=g.name;
-  document.getElementById('gv-gc').textContent=g.gc+' GC';
-  document.getElementById('gv-rep').textContent=g.reputation+' Reputation';
+// group view rendered by renderGroupView() defined above in new code
 
-  // Phase indicator
-  const ph=PHASES[S.phase-1];
-  document.getElementById('gv-phase-label').textContent=`${ph.n} – ${ph.lbl}`;
-  document.getElementById('gv-phase-desc').textContent=ph.desc;
-
-  // Thermo mini
-  const pct=((S.tempSlider-10)/20)*100;
-  const col=getTCol(S.tempSlider);
-  document.getElementById('gv-thermo-fill').style.height=pct+'%';
-  document.getElementById('gv-thermo-fill').style.background=col;
-  document.getElementById('gv-temp').textContent='+'+( S.tempSlider/10).toFixed(1)+'°C';
-  document.getElementById('gv-temp').style.color=col;
-  document.getElementById('gv-co2-lbl').textContent=`CO₂-Budget: ${S.co2Budget}`;
-  document.getElementById('gv-year-lbl').textContent=`Jahr ${S.year} · Runde ${S.round}`;
-
-  // Current card
-  if(S.currentCard){
-    const cc=document.getElementById('gv-cur-card');
-    cc.style.display='block';
-    cc.className=`gv-card ${S.currentCard.css||'news'}`;
-    document.getElementById('gv-card-badge').textContent=S.currentCard.badge||'Newsticker';
-    document.getElementById('gv-card-title').textContent=S.currentCard.t;
-    document.getElementById('gv-card-text').textContent=S.currentCard.x;
-  }
-
-  // Phase actions
-  renderGroupPhaseActions(g);
-
-  // Portfolio
-  const port=document.getElementById('gv-portfolio');
-  port.innerHTML=g.buildings.length?g.buildings.map(b=>{
-    const f=b.heat==='Erdgas'||b.heat==='Heizöl';
-    const ec=b.energy>170?'ecrit':'';
-    return `<div class="gv-bldg ${f?'fossil':'green'}">
-      <div class="gv-bldg-name">#${b.nr} ${b.name}</div>
-      <div class="gv-bldg-sub">${b.addr}</div>
-      <div class="gv-bldg-chips">
-        <span class="gv-chip ${ec}">${b.energy} kWh/m²</span>
-        <span class="gv-chip ${f?'fos':'grn'}">${b.heat}</span>
-        <span class="gv-chip">${b.co2} kg CO₂/m²</span>
-      </div>
-    </div>`;
-  }).join(''):'<div style="color:var(--muted2);font-size:11px">Keine Gebäude</div>';
-
-  // Ready button
-  const rbtn=document.getElementById('gv-ready-btn');
-  rbtn.className='ready-btn'+(g.ready?' is-ready':'');
-  rbtn.textContent=g.ready?'✓ Bereit gemeldet – warte auf Spielleiter':'✓ Fertig für nächste Phase';
-}
-
-function renderGroupPhaseActions(g){
-  const el=document.getElementById('gv-phase-actions');
-  const title=document.getElementById('gv-actions-title');
-  title.textContent=`Phase ${S.phase} – Aktionen`;
-
-  const phaseActions={
-    1:`<div class="gv-action-box">
-      <div class="gv-action-title">📰 Newsticker & Klimakarten</div>
-      <div style="font-size:11px;color:var(--muted)">Der Spielleiter zieht die Karten. Effekte gelten für alle Gruppen. Sieh die Karte oben.</div>
-    </div>`,
-    2:`<div class="gv-action-box">
-      <div class="gv-action-title">💰 Einnahmen & Zinsen</div>
-      <div class="gv-stat-row">
-        <div class="gv-stat"><div class="gv-stat-v">${g.buildings.length}</div><div class="gv-stat-l">Gebäude</div></div>
-        <div class="gv-stat"><div class="gv-stat-v" style="color:var(--green)">+${g.buildings.length} GC</div><div class="gv-stat-l">Mieteinnahmen</div></div>
-        <div class="gv-stat"><div class="gv-stat-v" style="color:var(--yellow)">${g.gc} GC</div><div class="gv-stat-l">aktuell</div></div>
-      </div>
-      <div style="font-size:10px;color:var(--muted)">Zukunftssichere Gebäude (3+ Capex, Redev., Neubau) bringen +1 GC extra.</div>
-    </div>`,
-    3:`<div class="gv-action-box">
-      <div class="gv-action-title">🏢 Transaktionen</div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:10px">Schau auf den Spielleiter-Screen für den aktuellen Markt. Teile dem Spielleiter dein Gebot mit.</div>
-      ${S.market&&S.market.length?'<div style="font-size:10px;color:var(--muted2)">Aktuelle Marktgebäude:<br>'+S.market.filter(m=>!m.sold).map(m=>m.building?`#${m.building.nr} ${m.building.name} (${m.building.energy} kWh, ${m.building.heat})`:'').join('<br>')+'</div>':'<div style="font-size:10px;color:var(--muted2)">Kein Markt aktiv</div>'}
-    </div>`,
-    4:`<div class="gv-action-box">
-      <div class="gv-action-title">🏗 Baumaßnahmen planen</div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Teile dem Spielleiter mit was du baust.</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:10px">
-        <div style="background:var(--surface);border-radius:4px;padding:8px"><strong>Capex</strong><br><span style="color:var(--muted)">${S.settings.capex||3} GC · sofort</span></div>
-        <div style="background:var(--surface);border-radius:4px;padding:8px"><strong>Redevelopment</strong><br><span style="color:var(--muted)">${S.settings.redev||10} GC · 1 Runde</span></div>
-        <div style="background:var(--surface);border-radius:4px;padding:8px"><strong>Abriss & Neubau</strong><br><span style="color:var(--muted)">${S.settings.neubau||20} GC · 2 Runden</span></div>
-        <div style="background:var(--surface);border-radius:4px;padding:8px"><strong>Mein Budget</strong><br><span style="color:var(--yellow)">${g.gc} GC verfügbar</span></div>
-      </div>
-    </div>`,
-    5:`<div class="gv-action-box">
-      <div class="gv-action-title">⚡ Weitere Aktionen</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:10px">
-        <div style="background:var(--surface);border-radius:4px;padding:8px"><strong>ESG-Strategie</strong><br><span style="color:var(--muted)">1 GC aufdecken + 2 GC umsetzen</span></div>
-        <div style="background:var(--surface);border-radius:4px;padding:8px"><strong>Marketing</strong><br><span style="color:var(--muted)">1 GC = +1 Reputation</span></div>
-        <div style="background:var(--surface);border-radius:4px;padding:8px"><strong>Schaden reparieren</strong><br><span style="color:var(--muted)">1 GC = 1 SP</span></div>
-        <div style="background:var(--surface);border-radius:4px;padding:8px"><strong>CO₂ ausgleichen</strong><br><span style="color:var(--muted)">${TEMP_TABLE.find(r=>r.t===S.tempSlider)?.co2price||1} GC je CO₂</span></div>
-      </div>
-      <div style="font-size:10px;color:var(--yellow);margin-top:8px">Verfügbar: ${g.gc} GC</div>
-    </div>`,
-    6:`<div class="gv-action-box">
-      <div class="gv-action-title">🌡 CO₂-Budget Abrechnung</div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Der Spielleiter bucht alle CO₂-Emissionen.</div>
-      <div class="gv-stat-row">
-        <div class="gv-stat"><div class="gv-stat-v" style="color:var(--red)">${g.totalCO2||0}</div><div class="gv-stat-l">CO₂ gesamt</div></div>
-        <div class="gv-stat"><div class="gv-stat-v">${S.co2Budget}</div><div class="gv-stat-l">Budget noch</div></div>
-        <div class="gv-stat"><div class="gv-stat-v" style="color:${getTCol(S.tempSlider)}">+${(S.tempSlider/10).toFixed(1)}°C</div><div class="gv-stat-l">Temperatur</div></div>
-      </div>
-    </div>`
-  };
-  el.innerHTML=phaseActions[S.phase]||'';
-}
 
 async function toggleReady(){
   const g=S.groups.find(x=>x.id===myGroupId); if(!g) return;
@@ -2053,14 +1973,686 @@ async function toggleReady(){
   renderGroupView();
 }
 
-// ═══════════════════════════════════
-// UTILS
-// ═══════════════════════════════════
-function shuffle(arr){ for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];}return arr; }
+const CAPEX_CARDS = [
+  {id:'c1',name:'Heizsystem: Fuel Switch',desc:'Du ersetzt das Heizsystem durch eine erneuerbare Variante (Wärmepumpe oder Fernwärme).',effect:'CO₂-Emissionen Betrieb −30%',co2:1,gc:3,tag:'fuel-switch'},
+  {id:'c2',name:'Elektrifizierung: Strom clever nutzen',desc:'Intelligente Steuerung und Photovoltaik (PV) machen das Gebäude stromsparend.',effect:'Energieverbrauch −10%',co2:1,gc:3,tag:'elektrifizierung'},
+  {id:'c3',name:'Moderne Haustechnik',desc:'Veraltete Technik raus, Effizienz rein. Umfassende Modernisierung der Gebäudetechnik.',effect:'Energieverbrauch −10%',co2:2,gc:3,tag:'haustechnik'},
+  {id:'c4',name:'Betrieb optimieren',desc:'Du optimierst Laufzeiten und Einstellungen der Hauptverbraucher für maximale Effizienz.',effect:'Energieverbrauch −10%',co2:2,gc:3,tag:'betrieb'},
+  {id:'c5',name:'Low-Carbon Ausbau',desc:'Einsatz langlebiger und natürlicher Materialien im Mieterausbau.',effect:'Gebäudeausbau: 1 CO₂',co2:1,gc:3,tag:'low-carbon'},
+  {id:'c6',name:'Biodiversität fördern',desc:'Entsiegelung und Schaffung von Grünflächen zur Förderung der Artenvielfalt.',effect:'Wirkung: Biodiversität stärken',co2:0,gc:3,tag:'biodiversitaet'},
+  {id:'c7',name:'Sturmfest & Resilient',desc:'Das Gebäude wird gegen Extremwetter geschützt und robuster gemacht.',effect:'1 Schadenspunkt weniger je Ereignis',co2:2,gc:3,tag:'sturmfest'},
+  {id:'c8',name:'Smart Building Upgrade',desc:'Sensorik, Raumdatenanalyse und automatisierte Verbrauchssteuerung.',effect:'Energieverbrauch −10% · CO₂-Emissionen Betrieb −10%',co2:3,gc:3,tag:'smart-building'},
+  {id:'c9',name:'Passive Kühlung',desc:'Verschattung, helle Fassaden und Nachtauskühlung – ohne Klimaanlage.',effect:'Energieverbrauch −10%',co2:1,gc:3,tag:'passive-kuehlung'},
+];
+
+const ESG_STRATEGIES = [
+  {id:'e1',name:'Nachhaltigkeitsbericht',desc:'Tue Gutes und rede darüber. Die erste Gruppe mit dieser Strategie erhält +3 Reputation.',effect:'Erste Gruppe: einmalig +3 Rep. Alle weiteren: +2 Rep.',cost:2,oneTime:true},
+  {id:'e2',name:'Grüne Dividende',desc:'Jede Runde kostet eine Capex-Maßnahme mit CO₂-Reduktion 1 GC weniger.',effect:'Capex mit CO₂-Reduktion: −1 GC/Runde',cost:2,permanent:true},
+  {id:'e3',name:'Low Carbon Design Prinzipien',desc:'Jede Capex oder Redevelopment verursacht bis zu 2 CO₂ weniger.',effect:'Capex/Redev: bis zu −2 CO₂',cost:2,permanent:true},
+  {id:'e4',name:'Leitfaden Biodiversität',desc:'Du erhältst einmalig +2 Reputation. Jede Capex „Biodiversität" kostet 1 GC weniger.',effect:'+2 Rep einmalig · Biodiversität-Capex −1 GC',cost:2},
+  {id:'e5',name:'Smart Meter Rollout',desc:'Jede Runde kannst du 1 CO₂-Abzug aus dem Gebäudebetrieb ignorieren.',effect:'1 CO₂/Runde ignorieren',cost:2,permanent:true},
+  {id:'e6',name:'PV-Rollout',desc:'Großflächige Photovoltaik senkt den Netzstrombezug. Jede Runde 1 CO₂ ignorieren.',effect:'1 CO₂/Runde ignorieren',cost:2,permanent:true},
+  {id:'e7',name:'ESG-Netzwerke',desc:'Für 1 GC kannst du 2 ESG-Strategien aufdecken und eine auswählen.',effect:'2 statt 1 aufdecken für 1 GC',cost:2,permanent:true},
+  {id:'e8',name:'ESG-Fortbildung',desc:'Jede Runde kannst du je Gebäude 2 Capex-Karten ziehen und eine auswählen.',effect:'2 Capex-Karten je Gebäude zur Auswahl',cost:2,permanent:true},
+  {id:'e9',name:'Grünstrom-Rahmenvertrag',desc:'Stromlieferung aus erneuerbaren Quellen. Jede Runde 1 CO₂ ignorieren.',effect:'1 CO₂/Runde ignorieren',cost:2,permanent:true},
+  {id:'e10',name:'ESG-Bonusprogramm',desc:'Die nächsten vier Baumaßnahmen mit CO₂/Energiereduktion bringen je +1 Reputation.',effect:'Nächste 4 Maßnahmen: je +1 Rep',cost:2},
+  {id:'e11',name:'CO₂-Bilanzierungssystem',desc:'Redevelopment und Neubau: −2 CO₂. Fuel Switch: −1 CO₂ und −10% CO₂ im Betrieb.',effect:'Redev/Neubau −2 CO₂ · Fuel Switch Bonus',cost:2,permanent:true},
+  {id:'e12',name:'Eigenes Energieunternehmen',desc:'Energiebezogene Capex kosten 1 GC weniger und reduzieren 10% CO₂ extra.',effect:'Energie-Capex: −1 GC und −10% CO₂',cost:2,permanent:true},
+  {id:'e13',name:'CO₂-Offsetting',desc:'4 CO₂/Runde kompensieren. Nächste Runde: +3 CO₂ zurück, −1 Reputation.',effect:'4 CO₂/Runde · Folgerunde Malus',cost:2,permanent:true},
+  {id:'e14',name:'Energie-Managementsystem',desc:'Energieverbräuche sinken um 5%. Bei Energiemaßnahmen +1 GC Gebäudewert.',effect:'Portfolio-Energie −5% · +1 GC Wert bei Maßnahmen',cost:2,permanent:true},
+  {id:'e15',name:'Green Building Zertifizierung',desc:'Für 1 GC extra je Redev./Neubau: +1 Rep und +1 GC Gebäudewert.',effect:'Redev/Neubau: +1 GC → +1 Rep & +1 GC Wert',cost:2,permanent:true},
+  {id:'e16',name:'Zirkuläre Projektentwicklung',desc:'Bei jeder Baumaßnahme: für 1 GC extra bis zu 2 CO₂ weniger.',effect:'Optional: +1 GC → −2 CO₂ je Maßnahme',cost:2,permanent:true},
+  {id:'e17',name:'Green Lease 3.0',desc:'Gebäude mit Redev. oder 3+ Capex: +1 GC Miete/Runde.',effect:'+1 GC Miete je Runde für zukunftssichere Gebäude',cost:2,permanent:true},
+  {id:'e18',name:'Klimaresilienz-Richtlinie',desc:'Jede Runde: bis zu 2 Schadenspunkte aus Ereignissen ignorieren.',effect:'2 SP/Runde ignorieren',cost:2,permanent:true},
+  {id:'e19',name:'ESG-Vergütung fürs Management',desc:'Bei >3 Reputation: +1 GC je Runde in Phase 2.',effect:'>3 Rep: +1 GC/Runde',cost:2,permanent:true},
+  {id:'e20',name:'Grüner CEO',desc:'Einmalig: ESG-Stapel durchsuchen und eine Karte sofort umsetzen.',effect:'Einmalig: freie ESG-Wahl',cost:2,oneTime:true},
+  {id:'e21',name:'Transition Agent',desc:'Für 1 GC: gezielt eine Capex-Karte wählen statt zufällig ziehen.',effect:'Capex gezielt wählen für 1 GC',cost:2,permanent:true},
+  {id:'e22',name:'DMA Risikoanalyse',desc:'Einmalig: negative Effekte einer Newsticker- oder Klimakarte ignorieren.',effect:'Einmalig: 1 Kartenwirkung ignorieren',cost:2,oneTime:true},
+];
+
+// ─── GROUP VIEW RENDERING ───
+function renderGroupView(){
+  const g=S.groups.find(x=>x.id===myGroupId); if(!g) return;
+  document.getElementById('gv-name').textContent=g.name;
+  document.getElementById('gv-gc').textContent=g.gc+' GC';
+  document.getElementById('gv-rep').textContent=(g.reputation||0)+' Reputation';
+  const ph=PHASES[S.phase-1];
+  document.getElementById('gv-phase-label').textContent=`${ph.n} – ${ph.lbl}`;
+  document.getElementById('gv-phase-desc').textContent=ph.desc;
+  const pct=((S.tempSlider-10)/20)*100,col=getTCol(S.tempSlider);
+  document.getElementById('gv-thermo-fill').style.height=pct+'%';
+  document.getElementById('gv-thermo-fill').style.background=col;
+  document.getElementById('gv-temp').textContent='+'+( S.tempSlider/10).toFixed(1)+'°C';
+  document.getElementById('gv-temp').style.color=col;
+  document.getElementById('gv-co2-lbl').textContent=`CO₂-Budget gesamt: ${S.co2Budget}`;
+  document.getElementById('gv-year-lbl').textContent=`Jahr ${S.year} · Runde ${S.round}`;
+  if(S.currentCard){
+    const cc=document.getElementById('gv-cur-card');
+    cc.style.display='block';
+    cc.className=`gv-card ${S.currentCard.css||'news'}`;
+    document.getElementById('gv-card-badge').textContent=S.currentCard.badge||'Newsticker';
+    document.getElementById('gv-card-title').textContent=S.currentCard.t||'';
+    document.getElementById('gv-card-text').textContent=S.currentCard.x||'';
+  } else {
+    document.getElementById('gv-cur-card').style.display='none';
+  }
+  renderGroupPhaseActions(g);
+  renderGroupPortfolio(g);
+  const rbtn=document.getElementById('gv-ready-btn');
+  rbtn.className='ready-btn'+(g.ready?' is-ready':'');
+  rbtn.textContent=g.ready?'✓ Bereit gemeldet':'✓ Fertig – nächste Phase';
+}
+
+function renderGroupPortfolio(g){
+  const port=document.getElementById('gv-portfolio');
+  if(!g.buildings||!g.buildings.length){port.innerHTML='<div style="color:var(--muted2);font-size:11px">Keine Gebäude</div>';return;}
+  port.innerHTML=g.buildings.map(b=>{
+    const f=b.heat==='Erdgas'||b.heat==='Heizöl';
+    const ec=b.energy>(S.settings.p_t1||170)?'ecrit':b.energy>(S.settings.p_t2||130)?'ewarn':'';
+    const capexDone=(b.capex||[]);
+    const zukunft=capexDone.length>=3||!!b.redevelopment||!!b.neubau;
+    const capexTags=capexDone.map(c=>`<span class="gv-chip grn">✓ ${c.name.split(':')[0]}</span>`).join('');
+    const spTag=(b.sp||0)>0?`<span class="gv-chip" style="background:rgba(239,68,68,.2);color:var(--red)">${b.sp} SP</span>`:'';
+    const kredTag=b.kredit?`<span class="gv-chip" style="color:var(--yellow)">Kredit</span>`:'';
+    return `<div class="gv-bldg ${f?'fossil':'green'}" style="${zukunft?'border-color:var(--green);':''}">
+      <div class="gv-bldg-name">#${b.nr} ${b.name} ${zukunft?'⭐':''}</div>
+      <div class="gv-bldg-sub">${b.addr}</div>
+      <div class="gv-bldg-chips">
+        <span class="gv-chip ${ec}">${b.energy} kWh/m²</span>
+        <span class="gv-chip ${f?'fos':'grn'}">${b.heat}</span>
+        <span class="gv-chip">${b.co2} kg CO₂</span>
+        ${spTag}${kredTag}
+      </div>
+      ${capexTags?`<div class="gv-bldg-chips" style="margin-top:4px">${capexTags}${b.redevelopment?'<span class="gv-chip grn">✓ Redev.</span>':''}${b.neubau?'<span class="gv-chip grn">✓ Neubau</span>':''}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function renderGroupPhaseActions(g){
+  const el=document.getElementById('gv-phase-actions');
+  document.getElementById('gv-actions-title').textContent=`Phase ${S.phase} – Aktionen`;
+  const fn=[null,renderPhase1,renderPhase2,renderPhase3,renderPhase4,renderPhase5,renderPhase6];
+  el.innerHTML=(fn[S.phase]||((g)=>''))(g);
+}
+
+function renderPhase1(g){
+  const card=S.currentCard;
+  return `<div class="gv-action-box">
+    <div class="gv-action-title">📰 Newsticker & Klimakarten</div>
+    ${card?`<div style="background:var(--surface);border-radius:6px;padding:10px;margin-bottom:8px">
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">${card.badge||''}</div>
+      <div style="font-size:15px;font-weight:500;margin-bottom:6px">${card.t||''}</div>
+      <div style="font-size:11px;color:var(--muted);line-height:1.7">${card.x||''}</div>
+    </div>`:'<div style="color:var(--muted2);font-size:11px">Warte auf Spielleiter…</div>'}
+  </div>`;
+}
+
+function renderPhase2(g){
+  const rent=S.settings.rent||1, rentZk=S.settings.rent_zk||1;
+  const activeBldgs=g.buildings.filter(b=>!(b.sp>=5)&&!b.underConstruction);
+  let baseRent=0,bonusRent=0,interest=0;const notes=[];
+  activeBldgs.forEach(b=>{
+    const f=b.heat==='Erdgas'||b.heat==='Heizöl',t=S.tempSlider;
+    let noRent=false;
+    if(t>=17&&f){noRent=true;notes.push(`#${b.nr}: fossile Heizung → keine Miete`);}
+    if(!noRent&&t>=16&&b.energy>(S.settings.p_t1||170)){noRent=true;notes.push(`#${b.nr}: Energie >${S.settings.p_t1||170} kWh → keine Miete`);}
+    if(!noRent&&t>=19&&b.energy>(S.settings.p_t2||130)){noRent=true;notes.push(`#${b.nr}: Energie >${S.settings.p_t2||130} kWh → keine Miete`);}
+    if(!noRent&&t>=20&&b.energy>(S.settings.p_t3||100)){noRent=true;notes.push(`#${b.nr}: Energie >${S.settings.p_t3||100} kWh → keine Miete`);}
+    if(!noRent){baseRent+=rent;const zk=(b.capex||[]).length>=3||!!b.redevelopment||!!b.neubau;if(zk)bonusRent+=rentZk;}
+  });
+  g.buildings.filter(b=>b.kredit).forEach(b=>{interest+=b.kredit==='redev'?1:2;});
+  const esgBonus=(g.esgStrategies||[]).find(e=>e.id==='e19')&&(g.reputation||0)>3?1:0;
+  const total=baseRent+bonusRent+esgBonus-interest;
+  return `<div class="gv-action-box">
+    <div class="gv-action-title">💰 Einnahmen & Zinsen</div>
+    <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:10px;font-size:11px">
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Miete (${activeBldgs.length-notes.length} Gebäude)</span><span style="color:var(--green)">+${baseRent} GC</span></div>
+      ${bonusRent?`<div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Zukunftssicher-Bonus</span><span style="color:var(--green)">+${bonusRent} GC</span></div>`:''}
+      ${esgBonus?`<div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">ESG Mgmt-Bonus</span><span style="color:var(--green)">+${esgBonus} GC</span></div>`:''}
+      ${interest?`<div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Kreditzinsen</span><span style="color:var(--red)">−${interest} GC</span></div>`:''}
+      <div style="border-top:1px solid var(--border);padding-top:5px;display:flex;justify-content:space-between;font-weight:500">
+        <span>Gesamt</span><span style="color:${total>=0?'var(--green)':'var(--red)'}">${total>=0?'+':''}${total} GC</span>
+      </div>
+    </div>
+    ${notes.length?`<div style="font-size:9px;color:var(--orange);margin-bottom:8px">${notes.join('<br>')}</div>`:''}
+    <button class="btn btn-primary btn-full" onclick="collectRent('${g.id}',${total})">✓ ${total>=0?'+':''}${total} GC buchen</button>
+  </div>`;
+}
+
+function renderPhase3(g){
+  // Phase 3: FIRST buy (market), THEN sell
+  const step=g.phase3step||'market';
+  if(step==='market'){
+    const avail=(S.market||[]).filter(m=>!m.sold&&m.building);
+    return `<div class="gv-action-box">
+      <div class="gv-action-title">🏢 Phase 3a – Transaktionsmarkt (Kaufen)</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:6px">Zuerst kaufen, dann verkaufen · Mindest: 20 GC · Verfügbar: <strong style="color:var(--yellow)">${g.gc} GC</strong></div>
+      <div style="background:var(--surface);border-radius:5px;padding:8px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:11px;color:var(--muted)">Transition-Bonus diese Runde:</span>
+        <span style="font-size:16px;font-weight:500;color:var(--green)">${S.transitionBonus||8} GC</span>
+      </div>
+      ${avail.map((item,i)=>{
+        const b=item.building,f=b.heat==='Erdgas'||b.heat==='Heizöl';
+        const myBid=(g.bids||{})[i]||0,highBid=item.highBid||20;
+        const isTop=myBid>0&&myBid>=highBid;
+        const ec=b.energy>170?'var(--red)':b.energy>130?'var(--orange)':'var(--green)';
+        return `<div class="gv-mcard ${f?'fossil':'grn'}" style="margin-bottom:8px">
+          <div class="gv-mcard-name">#${b.nr} ${b.name}</div>
+          <div class="gv-mcard-sub">${b.addr} · Reg.${b.reg}</div>
+          <div class="gv-mcard-stats">
+            <div class="gv-ms"><div class="gv-ms-v" style="color:${ec}">${b.energy}</div><div class="gv-ms-l">kWh/m²</div></div>
+            <div class="gv-ms"><div class="gv-ms-v" style="color:${f?'var(--orange)':'var(--green)'}">${b.heat.slice(0,8)}</div><div class="gv-ms-l">Heizung</div></div>
+            <div class="gv-ms"><div class="gv-ms-v">${b.co2}</div><div class="gv-ms-l">kg CO₂</div></div>
+          </div>
+          <div style="background:var(--surface);border-radius:4px;padding:6px;margin-bottom:6px">
+            <div style="font-size:9px;color:var(--muted)">Höchstgebot: <strong style="color:${isTop?'var(--green)':'var(--text)'}">${highBid} GC</strong>${item.highBidder?' · '+item.highBidder:''} ${isTop?'✓ Du führst':''}</div>
+          </div>
+          <div style="display:flex;gap:5px">
+            <input type="number" id="bid_${i}" value="${Math.max((highBid||20)+1,20)}" min="${(highBid||20)+1}" style="flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:4px;font-family:'DM Mono',monospace;font-size:12px">
+            <button class="btn btn-primary btn-sm" onclick="placeBid('${g.id}',${i})">Bieten</button>
+            ${myBid>0?`<button class="btn btn-sm btn-danger" onclick="withdrawBid('${g.id}',${i})">Raus</button>`:''}
+          </div>
+        </div>`;
+      }).join('')||'<div style="color:var(--muted2);font-size:11px;margin-bottom:8px">Kein Markt aktiv</div>'}
+      <button class="btn btn-primary btn-full" style="margin-top:6px" onclick="proceedToSell('${g.id}')">✓ Kaufphase abschließen → Verkauf</button>
+    </div>`;
+  }
+  // SELL phase
+  return `<div class="gv-action-box">
+    <div class="gv-action-title">📤 Phase 3b – Verkauf</div>
+    <div style="font-size:10px;color:var(--muted);margin-bottom:10px">Welche Gebäude möchtest du verkaufen? (Transition-Bonus: ${S.transitionBonus||8} GC)</div>
+    ${g.buildings.map(b=>{
+      const sel=(g.sellSelection||[]).includes(String(b.nr));
+      const price=calcSellPrice(b,g);
+      return `<div style="display:flex;align-items:center;gap:8px;background:var(--surface);border-radius:5px;padding:8px 10px;margin-bottom:5px;cursor:pointer;border:1px solid ${sel?'var(--green)':'var(--border)'}" onclick="toggleSellSelect('${g.id}','${b.nr}')">
+        <input type="checkbox" ${sel?'checked':''} style="accent-color:var(--green)" onclick="event.stopPropagation()">
+        <div style="flex:1">
+          <div style="font-size:12px;font-weight:500">#${b.nr} ${b.name}</div>
+          <div style="font-size:9px;color:var(--muted)">${b.energy} kWh · ${b.heat}${(b.sp||0)>0?' · '+b.sp+' SP':''}</div>
+        </div>
+        <div style="font-size:13px;color:var(--green);font-weight:500">${price} GC</div>
+      </div>`;
+    }).join('')||'<div style="color:var(--muted2);font-size:11px">Keine Gebäude</div>'}
+    <div style="display:flex;gap:6px;margin-top:10px">
+      <button class="btn btn-full" style="flex:1" onclick="executeSellSelection('${g.id}',false)">Kein Verkauf</button>
+      <button class="btn btn-primary btn-full" style="flex:1" onclick="executeSellSelection('${g.id}',true)">✓ Verkaufen</button>
+    </div>
+  </div>`;
+}
+
+function renderPhase4(g){
+  const cfg=S.settings;
+  // Ensure each building has a drawn capex if none yet this round
+  return `<div class="gv-action-box">
+    <div class="gv-action-title">🏗 Baumaßnahmen · ${g.gc} GC verfügbar</div>
+    <div style="font-size:9px;color:var(--muted);margin-bottom:10px">Je Gebäude wird eine Capex-Maßnahme zufällig gezogen. Für 1 GC neu ziehen. Jede Maßnahme nur einmal je Gebäude umsetzbar.</div>
+    ${g.buildings.map(b=>{
+      const capexDone=(b.capex||[]).map(c=>c.id);
+      const hasRedev=!!b.redevelopment, hasNeubau=!!b.neubau;
+      const drawnCapex=b.drawnCapex; // what was randomly drawn this round
+      const cap=(b.capex||[]).length, zukunft=cap>=3||hasRedev||hasNeubau;
+      const alreadyDoneThisRound=b.capexAppliedRound===S.round;
+      return `<div style="background:var(--surface);border-radius:6px;padding:10px;margin-bottom:8px;border:1px solid ${zukunft?'var(--green)':'var(--border)'}">
+        <div style="font-size:12px;font-weight:500;margin-bottom:2px">#${b.nr} ${b.name} ${zukunft?'⭐':''}</div>
+        <div style="font-size:9px;color:var(--muted);margin-bottom:5px">${b.energy} kWh · ${b.heat}${(b.sp||0)>0?' · '+b.sp+' SP':''}</div>
+        ${(b.capex||[]).length?`<div style="font-size:9px;color:var(--green);margin-bottom:5px">✓ ${(b.capex||[]).map(c=>c.name.split(':')[0]).join(' · ')}</div>`:''}
+        ${hasRedev?'<div style="font-size:9px;color:var(--green);margin-bottom:5px">✓ Redevelopment</div>':''}
+        ${hasNeubau?'<div style="font-size:9px;color:var(--orange);margin-bottom:5px">⏳ Neubau in Bau (keine Maßnahmen)</div>':''}
+        ${hasNeubau?'':`
+          ${alreadyDoneThisRound?`<div style="font-size:10px;color:var(--green)">✓ Capex diese Runde umgesetzt</div>`:`
+            ${drawnCapex?`
+              <div style="background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:8px;margin-bottom:6px">
+                <div style="font-size:9px;color:var(--muted);margin-bottom:3px">Gezogene Capex-Maßnahme:</div>
+                <div style="font-size:12px;font-weight:500;color:${capexDone.includes(drawnCapex.id)?'var(--muted2)':'var(--text)'}">${drawnCapex.name}</div>
+                <div style="font-size:9px;color:var(--muted);margin-top:2px">${drawnCapex.effect} · ${drawnCapex.co2} CO₂</div>
+                ${capexDone.includes(drawnCapex.id)?`<div style="font-size:9px;color:var(--orange);margin-top:3px">Bereits umgesetzt – neu ziehen empfohlen</div>`:''}
+              </div>
+              <div style="display:flex;gap:5px;flex-wrap:wrap">
+                ${!capexDone.includes(drawnCapex.id)?`<button class="btn btn-primary btn-sm" onclick="applyDrawnCapex('${g.id}','${b.nr}')">✓ Umsetzen (${cfg.capex||3} GC)</button>`:''}
+                <button class="btn btn-sm" onclick="redrawCapex('${g.id}','${b.nr}')">🎲 Neu ziehen (1 GC)</button>
+                ${!hasRedev?`<button class="btn btn-sm" onclick="applyRedev('${g.id}','${b.nr}')">Redevelopment (${cfg.redev||10} GC)</button>`:''}
+                ${!hasRedev&&!hasNeubau?`<button class="btn btn-sm btn-danger" onclick="applyNeubau('${g.id}','${b.nr}')">Neubau (${cfg.neubau||20} GC)</button>`:''}
+              </div>`:`
+              <div style="display:flex;gap:5px;flex-wrap:wrap">
+                <button class="btn btn-primary btn-sm" onclick="drawCapex('${g.id}','${b.nr}')">🎲 Capex ziehen</button>
+                ${!hasRedev?`<button class="btn btn-sm" onclick="applyRedev('${g.id}','${b.nr}')">Redevelopment (${cfg.redev||10} GC)</button>`:''}
+                ${!hasRedev?`<button class="btn btn-sm btn-danger" onclick="applyNeubau('${g.id}','${b.nr}')">Neubau (${cfg.neubau||20} GC)</button>`:''}
+              </div>`}
+          `}
+        `}
+      </div>`;
+    }).join('')||'<div style="color:var(--muted2)">Keine Gebäude</div>'}
+  </div>`;
+}
+
+function renderPhase5(g){
+  const esgOwned=(g.esgStrategies||[]);
+  const drawnESG=g.drawnESG; // currently drawn ESG card waiting for decision
+  const pricePerCO2=TEMP_TABLE.find(r=>r.t===S.tempSlider)?.co2price||1;
+  const esgDeckEmpty=!(S.esgGlobalDeck||[]).length;
+
+  return `<div class="gv-action-box">
+    <div class="gv-action-title">⚡ Weitere Aktionen · <span style="color:var(--yellow)">${g.gc} GC</span></div>
+
+    <!-- MARKETING -->
+    <div style="background:var(--surface);border-radius:5px;padding:9px;margin-bottom:8px">
+      <div style="font-size:11px;font-weight:500;margin-bottom:6px">📣 Marketing · ${S.settings.marketing||1} GC = +1 Reputation</div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <input type="number" id="mkt_rep" value="1" min="1" max="10" style="width:55px;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:4px 7px;border-radius:3px;font-family:'DM Mono',monospace;font-size:12px">
+        <span style="font-size:10px;color:var(--muted)">Reputation kaufen</span>
+        <button class="btn btn-primary btn-sm" onclick="buyReputation('${g.id}')">✓</button>
+      </div>
+    </div>
+
+    <!-- SCHÄDEN -->
+    ${g.buildings.some(b=>(b.sp||0)>0)?`<div style="background:var(--surface);border-radius:5px;padding:9px;margin-bottom:8px">
+      <div style="font-size:11px;font-weight:500;margin-bottom:6px">🔧 Schäden reparieren · ${S.settings.p_repair_gc||1} GC + 1 CO₂ je SP</div>
+      ${g.buildings.filter(b=>(b.sp||0)>0).map(b=>`
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+          <span style="flex:1;font-size:10px">#${b.nr} ${b.name} — ${b.sp} SP</span>
+          <input type="number" id="rep_${b.nr}" value="1" min="1" max="${b.sp}" style="width:45px;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:3px 5px;border-radius:3px;font-family:'DM Mono',monospace;font-size:11px">
+          <button class="btn btn-sm" onclick="repairBuilding('${g.id}','${b.nr}')">Reparieren</button>
+        </div>`).join('')}
+    </div>`:''}
+
+    <!-- ESG STRATEGIE: Global deck, zufällig, einmalig -->
+    <div style="background:var(--surface);border-radius:5px;padding:9px;margin-bottom:8px">
+      <div style="font-size:11px;font-weight:500;margin-bottom:4px">🌱 ESG-Strategie</div>
+      <div style="font-size:9px;color:var(--muted);margin-bottom:8px">Jede Strategie ist nur 1× im Spiel · 1 GC ziehen → dann entscheiden ob umsetzen (2 GC)</div>
+      ${esgOwned.length?`<div style="margin-bottom:8px;display:flex;flex-wrap:wrap;gap:3px">${esgOwned.map(e=>`<span style="background:rgba(167,139,250,.15);color:var(--purple);border:1px solid rgba(167,139,250,.3);padding:2px 7px;border-radius:3px;font-size:9px" title="${e.effect}">${e.name}</span>`).join('')}</div>`:''}
+      ${drawnESG&&!drawnESG.decided?`
+        <div style="background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.3);border-radius:6px;padding:10px;margin-bottom:8px">
+          <div style="font-size:9px;color:var(--purple);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Gezogene ESG-Strategie</div>
+          <div style="font-size:14px;font-weight:500;margin-bottom:4px">${drawnESG.name}</div>
+          <div style="font-size:10px;color:var(--muted);margin-bottom:6px">${drawnESG.desc}</div>
+          <div style="font-size:10px;font-weight:500;color:var(--purple);margin-bottom:8px">Effekt: ${drawnESG.effect}</div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-primary btn-sm" onclick="implementESG('${g.id}')">✓ Umsetzen (2 GC)</button>
+            <button class="btn btn-sm" onclick="discardESG('${g.id}')">✗ Ablehnen</button>
+          </div>
+        </div>`:`
+        <button class="btn btn-sm" onclick="drawESG('${g.id}')" ${esgDeckEmpty?'disabled':''}>
+          🎲 ESG-Karte ziehen (1 GC) ${esgDeckEmpty?'· Stapel leer':'· '+((S.esgGlobalDeck||[]).length)+' übrig'}
+        </button>`}
+    </div>
+
+    <!-- CO2 AUSGLEICH -->
+    <div style="background:var(--surface);border-radius:5px;padding:9px;margin-bottom:8px">
+      <div style="font-size:11px;font-weight:500;margin-bottom:6px">🌍 CO₂ ausgleichen · ${pricePerCO2} GC je CO₂</div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <input type="number" id="co2_offset_inp" value="1" min="1" style="width:55px;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:4px 7px;border-radius:3px;font-family:'DM Mono',monospace;font-size:12px">
+        <span style="font-size:10px;color:var(--muted)">CO₂</span>
+        <button class="btn btn-primary btn-sm" onclick="offsetCO2('${g.id}')">✓ Ausgleichen</button>
+      </div>
+    </div>
+
+    <!-- BANKKREDIT: nur wenn Redev oder Neubau, einmalig -->
+    ${g.buildings.some(b=>(b.redevelopment||b.neubau)&&!b.kredit)?`<div style="background:var(--surface);border-radius:5px;padding:9px">
+      <div style="font-size:11px;font-weight:500;margin-bottom:4px">🏦 Bankkredit</div>
+      <div style="font-size:9px;color:var(--muted);margin-bottom:6px">Nur für Gebäude mit Redevelopment oder Neubau · einmalig je Gebäude</div>
+      ${g.buildings.filter(b=>(b.redevelopment||b.neubau)&&!b.kredit).map(b=>`
+        <div style="display:flex;align-items:center;gap:4px;margin-bottom:4px;font-size:10px;flex-wrap:wrap">
+          <span style="flex:1">#${b.nr} ${b.name} ${b.redevelopment?'(Redev)':'(Neubau)'}</span>
+          ${b.redevelopment?`<button class="btn btn-sm" onclick="takeCredit('${g.id}','${b.nr}','redev')">+${S.settings.p_kr_redev||8} GC (−1/Runde)</button>`:''}
+          ${b.neubau?`<button class="btn btn-sm" onclick="takeCredit('${g.id}','${b.nr}','neubau')">+${S.settings.p_kr_neubau||16} GC (−2/Runde)</button>`:''}
+        </div>`).join('')}
+    </div>`:''}
+  </div>`;
+}
+
+function renderPhase6(g){
+  const cfg=S.settings;
+  const portfolioVal=g.buildings.reduce((s,b)=>{
+    const cap=Math.min(3,(b.capex||[]).length);
+    let v=cfg.p_s_base||15;
+    if(b.neubau) v+=cfg.p_s_neubau||20;
+    else if(b.redevelopment) v+=cfg.p_s_redev||10;
+    else v+=cap*(cfg.p_s_capex||3);
+    if(cap>=3||b.redevelopment||b.neubau) v+=cfg.p_trans||8;
+    return s+Math.max(0,v-(b.sp||0));
+  },0);
+  const totalVal=portfolioVal+(g.reputation||0)+g.gc;
+  const hist=g.valueHistory||[];
+  const allVals=[...hist,totalVal];
+  const maxV=Math.max(...allVals,1);
+  const W=220,H=48;
+  const pts=allVals.map((v,i)=>{
+    const x=allVals.length<2?W/2:i*(W/(allVals.length-1));
+    const y=H-(v/maxV)*(H-4);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  const spark=allVals.length>1?`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:${H}px">
+    <polyline points="${pts}" fill="none" stroke="var(--green)" stroke-width="2" stroke-linejoin="round"/>
+    <circle cx="${allVals.length<2?W/2:((allVals.length-1)*(W/(allVals.length-1))).toFixed(1)}" cy="${(H-(allVals[allVals.length-1]/maxV)*(H-4)).toFixed(1)}" r="3" fill="var(--green)"/>
+  </svg>`:'';
+  const fossil=g.buildings.filter(b=>b.heat==='Erdgas'||b.heat==='Heizöl').length;
+  const capexTotal=g.buildings.reduce((s,b)=>s+(b.capex||[]).length,0);
+  const roundCO2=g.roundCO2||0;
+  return `<div class="gv-action-box">
+    <div class="gv-action-title">📊 Jahresabschluss — Runde ${S.round} · Jahr ${S.year}</div>
+    <div style="background:var(--surface);border-radius:6px;padding:10px;margin-bottom:8px;text-align:center">
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px">Gesamtwert</div>
+      <div style="font-size:30px;font-family:'Fraunces',serif;font-weight:700;color:var(--green)">${totalVal} GC</div>
+      ${spark}
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:8px;font-size:10px">
+        <div><div style="font-size:15px;font-weight:500">${portfolioVal}</div><div style="color:var(--muted)">Portfolio</div></div>
+        <div><div style="font-size:15px;font-weight:500;color:var(--yellow)">${g.gc}</div><div style="color:var(--muted)">Liquidität</div></div>
+        <div><div style="font-size:15px;font-weight:500;color:var(--blue)">${g.reputation||0}</div><div style="color:var(--muted)">Reputation</div></div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
+      <div style="background:var(--surface);border-radius:5px;padding:8px;text-align:center"><div style="font-size:18px;font-weight:500">${g.buildings.length}</div><div style="font-size:9px;color:var(--muted)">Gebäude</div></div>
+      <div style="background:var(--surface);border-radius:5px;padding:8px;text-align:center"><div style="font-size:18px;font-weight:500">${capexTotal}</div><div style="font-size:9px;color:var(--muted)">Capex gesamt</div></div>
+      <div style="background:var(--surface);border-radius:5px;padding:8px;text-align:center"><div style="font-size:18px;font-weight:500;color:var(--orange)">${fossil}</div><div style="font-size:9px;color:var(--muted)">Fossil</div></div>
+      <div style="background:var(--surface);border-radius:5px;padding:8px;text-align:center"><div style="font-size:18px;font-weight:500;color:var(--red)">${roundCO2}</div><div style="font-size:9px;color:var(--muted)">CO₂ Runde</div></div>
+    </div>
+    <div style="background:var(--surface);border-radius:5px;padding:8px;margin-bottom:8px">
+      <div style="font-size:9px;color:var(--muted);margin-bottom:4px">CO₂ gesamt (${g.totalCO2||0} / ${S.co2PerGroup||70})</div>
+      <div style="background:var(--surface2);border-radius:3px;height:10px;overflow:hidden">
+        <div style="height:100%;width:${Math.min(100,Math.round((g.totalCO2||0)/(S.co2PerGroup||70)*100))}%;background:linear-gradient(to right,var(--green),var(--red));border-radius:3px;transition:width .5s"></div>
+      </div>
+    </div>
+    ${(g.esgStrategies||[]).length?`<div style="background:var(--surface);border-radius:5px;padding:8px">
+      <div style="font-size:9px;color:var(--muted);margin-bottom:5px">ESG-Strategien (${(g.esgStrategies||[]).length})</div>
+      <div style="display:flex;flex-wrap:wrap;gap:3px">${(g.esgStrategies||[]).map(e=>`<span style="background:rgba(167,139,250,.15);color:var(--purple);border:1px solid rgba(167,139,250,.3);padding:1px 6px;border-radius:2px;font-size:9px">${e.name}</span>`).join('')}</div>
+    </div>`:''}
+  </div>`;
+}
+
+// ─── TRANSITION BONUS ───
+async function rollTransitionBonus(){
+  const roll=Math.floor(Math.random()*6)+1;
+  let change=0,msg='';
+  if(roll%2===0){msg=`W6: ${roll} (gerade) – Bonus bleibt bei ${S.transitionBonus} GC`;change=0;}
+  else if(roll===1){msg=`W6: 1 – Bonus sinkt um 2 GC`;change=-2;}
+  else{msg=`W6: ${roll} (ungerade) – Bonus sinkt um 1 GC`;change=-1;}
+  S.transitionBonus=Math.max(0,(S.transitionBonus||8)+change);
+  document.getElementById('trans-bonus-display').textContent=S.transitionBonus+' GC';
+  document.getElementById('trans-roll-result').textContent=msg;
+  await fbSet('game/state',S);
+  logSys(msg);
+}
+
+function renderTransBonusDisplay(){
+  const el=document.getElementById('trans-bonus-display');
+  if(el) el.textContent=(S.transitionBonus??8)+' GC';
+}
+
+// ─── CAPEX DRAW (random, per building per round) ───
+function drawRandomCapex(excludeIds){
+  // Draw any capex card including already-drawn ones (same card can appear multiple times across buildings)
+  // but exclude already-applied ones for this building
+  const available=CAPEX_CARDS.filter(c=>!excludeIds.includes(c.id));
+  if(!available.length) return CAPEX_CARDS[Math.floor(Math.random()*CAPEX_CARDS.length)]; // all done, still draw
+  return available[Math.floor(Math.random()*available.length)];
+}
+
+async function drawCapex(gid,bnr){
+  const g=S.groups.find(x=>x.id===gid);if(!g)return;
+  const b=g.buildings.find(x=>String(x.nr)===String(bnr));if(!b)return;
+  const capexDone=(b.capex||[]).map(c=>c.id);
+  b.drawnCapex=drawRandomCapex(capexDone);
+  await fbSet('game/state',S);renderGroupView();
+}
+
+async function redrawCapex(gid,bnr){
+  const g=S.groups.find(x=>x.id===gid);if(!g)return;
+  const b=g.buildings.find(x=>String(x.nr)===String(bnr));if(!b)return;
+  if(g.gc<1){alert('1 GC für Neuzug benötigt');return;}
+  g.gc-=1;
+  const capexDone=(b.capex||[]).map(c=>c.id);
+  b.drawnCapex=drawRandomCapex(capexDone);
+  await fbSet('game/state',S);renderGroupView();renderGroups();
+}
+
+async function applyDrawnCapex(gid,bnr){
+  const g=S.groups.find(x=>x.id===gid);if(!g)return;
+  const b=g.buildings.find(x=>String(x.nr)===String(bnr));if(!b||!b.drawnCapex)return;
+  const card=b.drawnCapex;
+  const capexDone=(b.capex||[]).map(c=>c.id);
+  if(capexDone.includes(card.id)){alert('Diese Maßnahme ist bereits umgesetzt. Bitte neu ziehen.');return;}
+  const cost=S.settings.capex||3;
+  if(g.gc<cost){alert(`${cost} GC benötigt`);return;}
+  if(card.id==='c1') b.heat='Fernwärme';
+  b.capex=b.capex||[];
+  b.capex.push({id:card.id,name:card.name,co2:card.co2,effect:card.effect});
+  b.capexAppliedRound=S.round;
+  b.drawnCapex=null;
+  g.gc-=cost;
+  const co2=card.co2||0;
+  g.roundCO2=(g.roundCO2||0)+co2;g.totalCO2=(g.totalCO2||0)+co2;
+  S.co2Budget-=co2;
+  await fbSet('game/state',S);
+  renderGroupView();renderGroups();renderThermo();renderTicker();
+  logSys(`${g.name}: Capex „${card.name}" auf #${b.nr} (${co2} CO₂)`);
+}
+
+// replaces old applyCapex (keep for compatibility)
+async function applyCapex(gid,bnr){
+  return applyDrawnCapex(gid,bnr);
+}
+
+// ─── ESG GLOBAL DECK ───
+async function drawESG(gid){
+  const g=S.groups.find(x=>x.id===gid);if(!g)return;
+  if(g.gc<1){alert('1 GC für ESG-Karte ziehen benötigt');return;}
+  if(!(S.esgGlobalDeck||[]).length){alert('ESG-Stapel ist leer');return;}
+  g.gc-=1;
+  const eid=S.esgGlobalDeck.pop();
+  const card=ESG_STRATEGIES.find(e=>e.id===eid);
+  if(!card){await fbSet('game/state',S);return;}
+  g.drawnESG={...card,decided:false};
+  await fbSet('game/state',S);renderGroupView();renderGroups();
+  logSys(`${g.name} zieht ESG-Karte: „${card.name}"`);
+}
+
+async function implementESG(gid){
+  const g=S.groups.find(x=>x.id===gid);if(!g||!g.drawnESG)return;
+  const card=g.drawnESG;
+  if(g.gc<2){alert('2 GC für Umsetzung benötigt');return;}
+  g.gc-=2;
+  g.esgStrategies=g.esgStrategies||[];
+  g.esgStrategies.push({id:card.id,name:card.name,effect:card.effect,desc:card.desc,permanent:!!card.permanent});
+  g.drawnESG=null;
+  // Broadcast to all - log it prominently
+  await fbSet('game/state',S);
+  renderGroupView();renderGroups();
+  const msg=`🌱 ${g.name} setzt ESG-Strategie um: „${card.name}" — ${card.effect}`;
+  logSys(msg);
+  // Also push to global feed visible to SL
+  S.lastESGEvent=msg;
+  await fbSet('game/state',S);
+}
+
+async function discardESG(gid){
+  const g=S.groups.find(x=>x.id===gid);if(!g)return;
+  const card=g.drawnESG;
+  // Put card back at bottom of deck (shuffled back in)
+  if(card) S.esgGlobalDeck.unshift(card.id);
+  g.drawnESG=null;
+  await fbSet('game/state',S);renderGroupView();
+  logSys(`${g.name} lehnt ESG-Karte „${card?.name}" ab – zurück in Stapel`);
+}
+
+// ─── PHASE 3: buy-first sell-second ───
+async function proceedToSell(gid){
+  const g=S.groups.find(x=>x.id===gid);if(!g)return;
+  // First finalize any bids
+  await finalizeMarket(gid);
+  g.phase3step='sell';
+  await fbSet('game/state',S);renderGroupView();
+}
+
+async function executeSellSelection(gid,doSell){
+  const g=S.groups.find(x=>x.id===gid);if(!g)return;
+  if(doSell&&(g.sellSelection||[]).length>0){
+    for(const bnr of g.sellSelection){
+      const b=g.buildings.find(x=>String(x.nr)===String(bnr));if(!b)continue;
+      const price=calcSellPrice(b,g);
+      g.gc+=price;
+      _salesLogArr.unshift({rnd:S.round,text:`${g.name} verkauft #${b.nr} „${b.name}" → ${price} GC`});
+      _marketPool.push(b);
+    }
+    g.buildings=g.buildings.filter(b=>!(g.sellSelection||[]).includes(String(b.nr)));
+    g.sellSelection=[];
+    renderSalesLog();
+  }
+  g.phase3step='market'; // reset for next round
+  await fbSet('game/state',S);renderGroupView();renderGroups();
+}
+
+// ─── UPDATED calcSellPrice uses transitionBonus from state ───
+function calcSellPrice(b,g){
+  const cfg=S.settings,base=cfg.p_s_base||15;
+  const cap=Math.min(3,(b.capex||[]).length);
+  const bonus=b.neubau?(cfg.p_s_neubau||20):b.redevelopment?(cfg.p_s_redev||10):cap*(cfg.p_s_capex||3);
+  const zk=cap>=3||!!b.redevelopment||!!b.neubau;
+  const tb=zk?(S.transitionBonus??8):0;
+  return Math.max(0,base+bonus+tb-(b.sp||0));
+}
+
+async function collectRent(gid,amount){
+  const g=S.groups.find(x=>x.id===gid);if(!g)return;
+  g.gc+=amount;g.roundIncome=(g.roundIncome||0)+amount;
+  await fbSet('game/state',S);renderGroupView();
+}
+async function toggleSellSelect(gid,bnr){
+  const g=S.groups.find(x=>x.id===gid);if(!g)return;
+  g.sellSelection=g.sellSelection||[];
+  const idx=g.sellSelection.indexOf(String(bnr));
+  if(idx>-1)g.sellSelection.splice(idx,1);else g.sellSelection.push(String(bnr));
+  await fbSet('game/state',S);renderGroupView();
+}
+async function proceedToMarket(gid,doSell){
+  // Legacy: redirect to new flow
+  return doSell ? proceedToSell(gid) : (()=>{const g=S.groups.find(x=>x.id===gid);if(g){g.phase3step='market';fbSet('game/state',S);renderGroupView();}})();
+}
+async function placeBid(gid,idx){
+  const g=S.groups.find(x=>x.id===gid);if(!g)return;
+  const inp=document.getElementById(`bid_${idx}`);
+  const price=parseInt(inp?.value)||20;
+  const item=S.market[idx];if(!item||item.sold)return;
+  if(price<(item.highBid||20)+1){alert(`Mindestgebot: ${(item.highBid||20)+1} GC`);return;}
+  if(price>g.gc){alert(`Nicht genug GC (${g.gc} verfügbar)`);return;}
+  g.bids=g.bids||{};g.bids[idx]=price;
+  item.highBid=price;item.highBidder=g.name;item.highBidderGroup=gid;
+  await fbSet('game/state',S);renderGroupView();renderMarket();
+}
+async function withdrawBid(gid,idx){
+  const g=S.groups.find(x=>x.id===gid);if(!g)return;
+  g.bids=g.bids||{};delete g.bids[idx];
+  // recalculate high bid
+  const item=S.market[idx];if(item){
+    let max=0,maxGid=null,maxName=null;
+    S.groups.forEach(gr=>{const b=(gr.bids||{})[idx]||0;if(b>max){max=b;maxGid=gr.id;maxName=gr.name;}});
+    item.highBid=Math.max(20,max);item.highBidder=maxName;item.highBidderGroup=maxGid;
+  }
+  await fbSet('game/state',S);renderGroupView();renderMarket();
+}
+async function finalizeMarket(gid){
+  let changed=false;
+  S.market.forEach(item=>{
+    if(item.sold||!item.highBidder||!item.building)return;
+    const winner=S.groups.find(x=>x.id===item.highBidderGroup);if(!winner)return;
+    winner.gc-=item.highBid;winner.buildings.push(item.building);
+    item.sold=true;item.buyer=item.highBidder;item.price=item.highBid;
+    _salesLogArr.unshift({rnd:S.round,text:`${winner.name} kauft #${item.building.nr} „${item.building.name}" — ${item.highBid} GC`});
+    changed=true;
+  });
+  const g=S.groups.find(x=>x.id===gid);
+  if(g){g.phase3step='sell';delete g.bids;}
+  if(changed)renderSalesLog();
+  await fbSet('game/state',S);renderGroupView();renderMarket();renderGroups();
+}
+async function applyCapex(gid,bnr){
+  const g=S.groups.find(x=>x.id===gid);if(!g)return;
+  const b=g.buildings.find(x=>String(x.nr)===String(bnr));if(!b)return;
+  const sel=document.getElementById(`capex_sel_${bnr}`);
+  const cid=sel?.value;if(!cid){alert('Capex auswählen');return;}
+  const card=CAPEX_CARDS.find(c=>c.id===cid);if(!card)return;
+  const cost=S.settings.capex||3;
+  if(g.gc<cost){alert(`Nicht genug GC (${cost} benötigt)`);return;}
+  b.capex=b.capex||[];
+  if(b.capex.find(c=>c.id===cid)){alert('Bereits umgesetzt');return;}
+  if(cid==='c1'){b.heat='Fernwärme';} // fuel switch changes heating
+  b.capex.push({id:cid,name:card.name,co2:card.co2,effect:card.effect});
+  g.gc-=cost;g.roundCO2=(g.roundCO2||0)+card.co2;g.totalCO2=(g.totalCO2||0)+card.co2;
+  await fbSet('game/state',S);renderGroupView();renderGroups();
+}
+async function applyRedev(gid,bnr){
+  const g=S.groups.find(x=>x.id===gid);if(!g)return;
+  const b=g.buildings.find(x=>String(x.nr)===String(bnr));if(!b)return;
+  const cost=S.settings.redev||10;
+  if(g.gc<cost){alert(`${cost} GC benötigt`);return;}
+  g.gc-=cost;b.redevelopment=true;b.capex=[];
+  b.heat='Fernwärme';b.energy=Math.round(b.energy*0.5);
+  b.co2=Math.round(b.co2*0.5*10)/10;b.sp=Math.max(0,(b.sp||0)-5);
+  b.underConstruction=1;
+  const co2=S.settings.p_redev_co2||7;
+  g.roundCO2=(g.roundCO2||0)+co2;g.totalCO2=(g.totalCO2||0)+co2;
+  await fbSet('game/state',S);renderGroupView();renderGroups();
+}
+async function applyNeubau(gid,bnr){
+  const g=S.groups.find(x=>x.id===gid);if(!g)return;
+  const b=g.buildings.find(x=>String(x.nr)===String(bnr));if(!b)return;
+  const cost=S.settings.neubau||20;
+  if(g.gc<cost){alert(`${cost} GC benötigt`);return;}
+  if(!confirm(`Abriss & Neubau für #${b.nr} ${b.name}?`))return;
+  g.gc-=cost;b.neubau=true;b.redevelopment=false;b.capex=[];b.sp=0;b.underConstruction=2;
+  const co2=S.settings.p_neubau_co2||36;
+  g.roundCO2=(g.roundCO2||0)+co2;g.totalCO2=(g.totalCO2||0)+co2;
+  await fbSet('game/state',S);renderGroupView();renderGroups();
+}
+async function buyReputation(gid){
+  const g=S.groups.find(x=>x.id===gid);if(!g)return;
+  const amt=parseInt(document.getElementById('mkt_rep')?.value)||1;
+  const cost=amt*(S.settings.marketing||1);
+  if(g.gc<cost){alert(`${cost} GC benötigt`);return;}
+  g.gc-=cost;g.reputation=(g.reputation||0)+amt;
+  await fbSet('game/state',S);renderGroupView();renderGroups();
+}
+async function repairBuilding(gid,bnr){
+  const g=S.groups.find(x=>x.id===gid);if(!g)return;
+  const b=g.buildings.find(x=>String(x.nr)===String(bnr));if(!b)return;
+  const amt=parseInt(document.getElementById(`rep_${bnr}`)?.value)||1;
+  const cost=amt*(S.settings.p_repair_gc||1);
+  if(g.gc<cost){alert(`${cost} GC benötigt`);return;}
+  g.gc-=cost;b.sp=Math.max(0,(b.sp||0)-amt);
+  g.roundCO2=(g.roundCO2||0)+amt*(S.settings.p_repair_co2||1);
+  await fbSet('game/state',S);renderGroupView();
+}
+async function buyESG(gid){
+  const g=S.groups.find(x=>x.id===gid);if(!g)return;
+  const eid=document.getElementById('esg_sel')?.value;if(!eid){alert('Strategie auswählen');return;}
+  const card=ESG_STRATEGIES.find(e=>e.id===eid);if(!card)return;
+  if(g.gc<card.cost){alert(`${card.cost} GC benötigt`);return;}
+  g.gc-=card.cost;
+  g.esgStrategies=g.esgStrategies||[];
+  g.esgStrategies.push({id:card.id,name:card.name,effect:card.effect,permanent:!!card.permanent});
+  await fbSet('game/state',S);renderGroupView();renderGroups();
+}
+async function offsetCO2(gid){
+  const g=S.groups.find(x=>x.id===gid);if(!g)return;
+  const amt=parseInt(document.getElementById('co2_offset_inp')?.value)||1;
+  const pricePerCO2=TEMP_TABLE.find(r=>r.t===S.tempSlider)?.co2price||1;
+  const cost=amt*pricePerCO2;
+  if(g.gc<cost){alert(`${cost} GC benötigt`);return;}
+  g.gc-=cost;g.roundCO2=(g.roundCO2||0)-amt;
+  S.co2Budget=Math.min(S.co2Budget+amt,S.co2PerGroup*S.groups.length);
+  await fbSet('game/state',S);renderGroupView();renderTicker();renderThermo();
+}
+async function takeCredit(gid,bnr,type){
+  const g=S.groups.find(x=>x.id===gid);if(!g)return;
+  const b=g.buildings.find(x=>String(x.nr)===String(bnr));if(!b||b.kredit)return;
+  const amount=type==='redev'?(S.settings.p_kr_redev||8):(S.settings.p_kr_neubau||16);
+  g.gc+=amount;b.kredit=type;
+  await fbSet('game/state',S);renderGroupView();renderGroups();
+}
+(arr){ for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];}return arr; }
 function closeModal(id){ document.getElementById(id)?.classList.remove('open'); }
 document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open');}));
 
-// ── EXPOSE TO WINDOW (needed because type="module" creates isolated scope) ──
+// ── EXPOSE TO WINDOW ──
 Object.assign(window, {
   // Onboarding
   onbAdd, rmOnbGroup, topt, switchStab, saveSettings, resetSettings, loadPreset, launchGame,
@@ -2070,20 +2662,29 @@ Object.assign(window, {
   setPhase, toggleTimer,
   // Cards
   drawCard, reshuffleNews,
-  // Market
+  // Market (SL)
   refreshMarket, openBidModal, executeBid, openSellModal, updateSellBldgs, updateSellPrice, executeSell,
+  // Transition bonus
+  rollTransitionBonus,
   // Portfolio
   openAddGroupModal, addGroupInGame,
   // Buildings
   filterBldgs, fp, fpE, showBldgDetail, assignBldg,
   // CO2
   updateCO2Summary, bookRoundCO2, qTotal, quickBook,
-  // Group view
+  // Group view core
   joinGroup, toggleReady,
-  // Thermo
-  manualTemp,
-  // Modal
-  closeModal,
+  // Phase 3
+  proceedToMarket, proceedToSell, executeSellSelection, toggleSellSelect,
+  placeBid, withdrawBid, finalizeMarket,
+  // Phase 4 capex
+  drawCapex, redrawCapex, applyDrawnCapex, applyCapex, applyRedev, applyNeubau,
+  // Phase 5 actions
+  collectRent, buyReputation, repairBuilding,
+  drawESG, implementESG, discardESG,
+  offsetCO2, takeCredit,
+  // Thermo & modal
+  manualTemp, closeModal,
 });
 
 // ── START ──
