@@ -2060,6 +2060,32 @@ function shuffle(arr){ for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.r
 function closeModal(id){ document.getElementById(id)?.classList.remove('open'); }
 document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open');}));
 
+// ── EXPOSE TO WINDOW (needed because type="module" creates isolated scope) ──
+Object.assign(window, {
+  // Onboarding
+  onbAdd, rmOnbGroup, topt, switchStab, saveSettings, resetSettings, loadPreset, launchGame,
+  // Dashboard nav
+  goSettings, ctab, prevRound, nextRound,
+  // Phase & timer
+  setPhase, toggleTimer,
+  // Cards
+  drawCard, reshuffleNews,
+  // Market
+  refreshMarket, openBidModal, executeBid, openSellModal, updateSellBldgs, updateSellPrice, executeSell,
+  // Portfolio
+  openAddGroupModal, addGroupInGame,
+  // Buildings
+  filterBldgs, fp, fpE, showBldgDetail, assignBldg,
+  // CO2
+  updateCO2Summary, bookRoundCO2, qTotal, quickBook,
+  // Group view
+  joinGroup, toggleReady,
+  // Thermo
+  manualTemp,
+  // Modal
+  closeModal,
+});
+
 // ── START ──
 init();
 </script>
