@@ -1102,19 +1102,15 @@ const BUILDINGS=[
 ];
 const GRP_COLORS=['#4ade80','#60a5fa','#f97316','#a78bfa','#fbbf24','#f472b6','#34d399','#fb923c','#818cf8','#e879f9'];
 
-function ESG_STRATEGY_IDS(){ return ESG_STRATEGIES.map(e=>e.id); }
-
 // ── STATE ──
 let S = {
   round:1, year:2025, tempSlider:13, co2Budget:210, co2PerGroup:70,
   maxRounds:'?', phase:1, currentCard:null,
-  transitionBonus:8,          // global, rolled each round
-  esgGlobalDeck: shuffle(ESG_STRATEGY_IDS()), // global ESG deck, each card once
+  transitionBonus:8,
+  esgGlobalDeck: [],  // filled at game launch after ESG_STRATEGIES is defined
   groups:[], market:[], salesLog:[],
-  newstickerDeck: shuffle([...NEWSTICKER]),
-  klimaGDeck: shuffle([...KLIMA_G]),
-  klimaODeck: shuffle([...KLIMA_O]),
-  klimaRDeck: shuffle([...KLIMA_R]),
+  newstickerDeck: [],
+  klimaGDeck: [], klimaODeck: [], klimaRDeck: [],
   settings: defaultSettings(),
   toggles:{klima:'alle',startmode:'random'},
   phaseTimes:[0,0,5,5,3,2],
@@ -1296,6 +1292,8 @@ async function launchGame(){
 
   S={...S, round:1, year:y, tempSlider:t, co2Budget:pg*groups.length, co2PerGroup:pg,
     maxRounds:mr, phase:1, groups, market:[], salesLog:[],
+    transitionBonus:8,
+    esgGlobalDeck: shuffle(ESG_STRATEGIES.map(e=>e.id)),
     newstickerDeck:shuffle([...NEWSTICKER]),
     klimaGDeck:shuffle([...KLIMA_G]), klimaODeck:shuffle([...KLIMA_O]), klimaRDeck:shuffle([...KLIMA_R]),
     currentCard:null };
