@@ -1,0 +1,2067 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>ImmoGame</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;0,9..144,900;1,9..144,300&display=swap');
+
+:root {
+  --bg:#0d0f0e; --surface:#161a18; --surface2:#1e2421; --surface3:#242c27;
+  --border:#2a312d; --text:#e8ede9; --muted:#7a8c7e; --muted2:#556259;
+  --green:#4ade80; --green-dim:#1a3a22; --yellow:#fbbf24; --orange:#f97316;
+  --red:#ef4444; --blue:#60a5fa; --purple:#a78bfa;
+  --safe:#22c55e; --warn:#eab308; --hot:#f97316; --crit:#dc2626;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;font-size:13px;min-height:100vh;}
+.hidden{display:none!important;}
+
+/* ── SCREENS ── */
+.screen{display:none;flex-direction:column;min-height:100vh;}
+.screen.active{display:flex;}
+
+/* ── SHARED UTILS ── */
+.btn{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 16px;border-radius:5px;cursor:pointer;font-family:'DM Mono',monospace;font-size:12px;transition:all .15s;white-space:nowrap;}
+.btn:hover{border-color:var(--green);color:var(--green);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.btn-primary{background:var(--green);color:#0d0f0e;border-color:var(--green);font-weight:500;}
+.btn-primary:hover{background:#22c55e;color:#0d0f0e;}
+.btn-danger{border-color:var(--red);color:var(--red);}
+.btn-danger:hover{background:var(--red);color:#fff;}
+.btn-sm{padding:5px 11px;font-size:11px;}
+.btn-full{width:100%;}
+.label{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);display:block;margin-bottom:5px;}
+.input{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:5px;font-family:'DM Mono',monospace;font-size:13px;transition:border-color .15s;}
+.input:focus{outline:none;border-color:var(--green);}
+select.input{cursor:pointer;}
+.field{margin-bottom:12px;}
+.logo{font-family:'Fraunces',serif;font-weight:900;font-size:22px;letter-spacing:-1px;color:var(--green);}
+.logo em{color:var(--muted);font-weight:300;font-style:italic;}
+::-webkit-scrollbar{width:3px;height:3px;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+
+/* ── CONNECTING SCREEN ── */
+#screen-connect{align-items:center;justify-content:center;gap:20px;}
+.connect-box{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:32px;max-width:400px;width:90%;text-align:center;}
+.spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.connect-status{font-size:12px;color:var(--muted);margin-top:8px;}
+
+/* ── ONBOARDING ── */
+#screen-onboarding{overflow-y:auto;}
+.onb-wrap{max-width:1100px;margin:0 auto;padding:28px 32px 40px;}
+.onb-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;}
+.onb-grid{display:grid;grid-template-columns:1fr 1fr;gap:0;}
+.onb-left{padding-right:36px;}
+.onb-right{border-left:1px solid var(--border);padding-left:36px;}
+.section-title{font-size:9px;text-transform:uppercase;letter-spacing:2px;color:var(--muted2);padding-bottom:8px;border-bottom:1px solid var(--border);margin-bottom:14px;}
+.groups-list{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;}
+.group-row{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:8px 12px;animation:fadeUp .2s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:translateY(0);}}
+.group-row .cdot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+.group-row .gn{flex:1;font-size:12px;}
+.group-row .ggc{font-size:10px;color:var(--yellow);}
+.group-row .gp{font-size:9px;color:var(--muted);}
+.group-row .rm{background:none;border:none;color:var(--muted2);cursor:pointer;font-size:18px;line-height:1;transition:color .15s;}
+.group-row .rm:hover{color:var(--red);}
+.add-row{display:flex;gap:6px;}
+.input-row{display:flex;gap:10px;}
+.input-row .field{flex:1;}
+.toggle-group{display:flex;background:var(--surface2);border:1px solid var(--border);border-radius:5px;overflow:hidden;}
+.topt{flex:1;padding:7px 10px;text-align:center;cursor:pointer;font-size:10px;color:var(--muted);border-right:1px solid var(--border);transition:all .15s;}
+.topt:last-child{border-right:none;}
+.topt.active{background:var(--green);color:#0d0f0e;font-weight:500;}
+.params-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px;}
+.param-box{background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:10px 12px;}
+.param-box .pl{font-size:8px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:4px;}
+.param-box .pv{font-family:'Fraunces',serif;font-size:20px;font-weight:700;color:var(--green);line-height:1;}
+.stabs{display:flex;background:var(--surface2);border:1px solid var(--border);border-radius:5px;overflow:hidden;margin-bottom:14px;}
+.stab{flex:1;padding:7px;text-align:center;cursor:pointer;font-size:10px;color:var(--muted);border-right:1px solid var(--border);transition:all .15s;}
+.stab:last-child{border-right:none;}
+.stab.active{background:var(--surface3);color:var(--text);}
+.scontent{display:none;}
+.scontent.active{display:block;}
+.ctable{width:100%;border-collapse:collapse;font-size:11px;}
+.ctable th{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);padding:5px 7px;text-align:left;border-bottom:1px solid var(--border);}
+.ctable td{padding:5px 7px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.ctable tr:last-child td{border-bottom:none;}
+.ctable input{width:58px;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:3px 6px;border-radius:3px;font-family:'DM Mono',monospace;font-size:11px;text-align:center;}
+.ctable input:focus{outline:none;border-color:var(--green);}
+.ctable .rl{color:var(--muted);}
+.ctable .rl strong{color:var(--text);}
+.onb-footer{border-top:1px solid var(--border);padding:16px 32px;display:flex;justify-content:space-between;align-items:center;background:var(--surface);}
+.launch-info{font-size:11px;color:var(--muted);line-height:1.8;}
+.launch-info strong{color:var(--text);}
+.save-ok{font-size:10px;color:var(--green);opacity:0;transition:opacity .3s;margin-left:8px;}
+.save-ok.show{opacity:1;}
+
+/* ── DASHBOARD (Spielleiter) ── */
+#screen-dashboard{flex-direction:column;}
+.dash-hdr{display:flex;align-items:center;justify-content:space-between;padding:0 18px;height:50px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;gap:12px;}
+.dash-logo{font-family:'Fraunces',serif;font-weight:900;font-size:16px;color:var(--green);}
+.dash-logo em{color:var(--muted2);font-weight:300;font-style:italic;font-size:13px;}
+
+/* TICKER */
+.ticker{display:flex;align-items:center;gap:14px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 14px;}
+.tick-item{text-align:center;}
+.tick-val{font-family:'Fraunces',serif;font-size:18px;font-weight:700;line-height:1;}
+.tick-lbl{font-size:8px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-top:1px;}
+.tick-div{width:1px;height:26px;background:var(--border);}
+
+/* PHASE BAR */
+.phase-bar{display:flex;align-items:center;gap:0;background:var(--surface);border-bottom:1px solid var(--border);padding:0 18px;flex-shrink:0;overflow-x:auto;}
+.phase-step{display:flex;align-items:center;gap:6px;padding:10px 14px;font-size:10px;color:var(--muted);white-space:nowrap;border-bottom:2px solid transparent;cursor:pointer;transition:all .15s;}
+.phase-step.active{color:var(--green);border-bottom-color:var(--green);}
+.phase-step.done{color:var(--muted2);}
+.phase-step .pnum{width:18px;height:18px;border-radius:50%;border:1px solid currentColor;display:flex;align-items:center;justify-content:center;font-size:9px;flex-shrink:0;}
+.phase-step.active .pnum{background:var(--green);color:#0d0f0e;border-color:var(--green);}
+.phase-step.done .pnum{background:var(--green-dim);border-color:var(--green);}
+
+/* READY INDICATORS */
+.ready-bar{background:var(--surface2);border-bottom:1px solid var(--border);padding:6px 18px;display:flex;gap:8px;align-items:center;flex-shrink:0;overflow-x:auto;}
+.ready-chip{display:flex;align-items:center;gap:5px;padding:3px 8px;border-radius:20px;border:1px solid var(--border);font-size:10px;white-space:nowrap;transition:all .3s;}
+.ready-chip.done{border-color:var(--green);background:rgba(74,222,128,.1);color:var(--green);}
+.ready-chip.waiting{color:var(--muted);}
+.ready-chip .rdot{width:6px;height:6px;border-radius:50%;}
+.ready-chip.done .rdot{background:var(--green);}
+.ready-chip.waiting .rdot{background:var(--muted2);}
+.ready-lbl{font-size:9px;color:var(--muted2);margin-right:4px;flex-shrink:0;}
+
+/* MAIN 3-COL */
+.dash-main{display:grid;grid-template-columns:210px 1fr 270px;flex:1;overflow:hidden;min-height:0;}
+
+/* LEFT THERMO PANEL */
+.left-panel{background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;padding:14px;gap:12px;}
+.plabel{font-size:8px;text-transform:uppercase;letter-spacing:2px;color:var(--muted2);margin-bottom:6px;}
+
+.thermo-wrap{display:flex;gap:8px;}
+.thermo-tube{width:26px;height:240px;background:var(--surface2);border:1px solid var(--border);border-radius:13px;position:relative;overflow:hidden;flex-shrink:0;}
+.thermo-fill{position:absolute;bottom:0;left:0;right:0;transition:height .7s cubic-bezier(.4,0,.2,1),background .7s;border-radius:0 0 12px 12px;}
+.thermo-labels{flex:1;height:240px;position:relative;}
+.tlabel{position:absolute;right:0;transform:translateY(-50%);font-size:9px;color:var(--muted2);white-space:nowrap;display:flex;align-items:center;gap:3px;}
+.tlabel.cur{color:var(--text);font-size:10px;font-weight:500;}
+.tdot{width:4px;height:4px;border-radius:50%;flex-shrink:0;}
+.tlabel.cur .tdot{width:7px;height:7px;}
+
+.readout{background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:9px;text-align:center;}
+.readout-big{font-family:'Fraunces',serif;font-size:28px;font-weight:900;line-height:1;transition:color .4s;}
+.readout-sub{font-size:9px;color:var(--muted);margin-top:3px;}
+
+.range-wrap input[type=range]{-webkit-appearance:none;width:100%;height:5px;border-radius:3px;outline:none;cursor:pointer;background:linear-gradient(to right,#22c55e,#eab308,#f97316,#dc2626);}
+.range-wrap input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;background:var(--text);border:2px solid var(--bg);box-shadow:0 0 0 2px var(--green);}
+.range-lbl{display:flex;justify-content:space-between;font-size:8px;color:var(--muted2);margin-top:3px;}
+
+.effect-card{background:var(--surface2);border:1px solid var(--border);border-radius:5px;overflow:hidden;}
+.erow{display:flex;align-items:flex-start;gap:6px;padding:5px 8px;border-bottom:1px solid var(--border);font-size:9px;line-height:1.4;color:var(--muted2);}
+.erow:last-child{border-bottom:none;}
+.erow.active{background:rgba(239,68,68,.08);color:var(--text);}
+.etag{font-size:8px;padding:1px 4px;border-radius:2px;background:var(--surface3);color:var(--muted);white-space:nowrap;flex-shrink:0;margin-top:1px;}
+.erow.active .etag{background:rgba(239,68,68,.2);color:var(--red);}
+
+/* CENTER PANEL */
+.center-panel{display:flex;flex-direction:column;min-height:0;overflow:hidden;}
+.ctabs{display:flex;background:var(--surface);border-bottom:1px solid var(--border);padding:0 14px;flex-shrink:0;}
+.ctab{padding:12px 14px;cursor:pointer;font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);border-bottom:2px solid transparent;transition:all .15s;}
+.ctab.active{color:var(--green);border-bottom-color:var(--green);}
+.ctab:hover:not(.active){color:var(--text);}
+.ctab-body{display:none;flex:1;overflow-y:auto;padding:16px;}
+.ctab-body.active{display:block;}
+
+/* CARDS */
+.draw-row{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+.active-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:12px;position:relative;overflow:hidden;}
+.active-card::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
+.active-card.news::after{background:var(--blue);}
+.active-card.gelb::after{background:var(--yellow);}
+.active-card.orange::after{background:var(--orange);}
+.active-card.rot::after{background:var(--red);}
+.card-badge{font-size:9px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);margin-bottom:5px;}
+.card-title{font-family:'Fraunces',serif;font-size:20px;font-weight:700;line-height:1.15;margin-bottom:8px;}
+.card-body{font-size:12px;color:var(--muted);line-height:1.75;}
+.hist-list{display:flex;flex-direction:column;gap:5px;}
+.hist-row{display:flex;gap:8px;align-items:center;padding:7px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;font-size:10px;opacity:.55;}
+.hist-row:first-child{opacity:.85;}
+.hist-rnd{font-size:9px;color:var(--muted2);width:38px;flex-shrink:0;}
+.hbadge{font-size:8px;padding:1px 5px;border-radius:2px;flex-shrink:0;}
+.hbadge.news{background:rgba(96,165,250,.15);color:var(--blue);}
+.hbadge.gelb{background:rgba(251,191,36,.15);color:var(--yellow);}
+.hbadge.orange{background:rgba(249,115,22,.15);color:var(--orange);}
+.hbadge.rot{background:rgba(239,68,68,.15);color:var(--red);}
+
+/* PORTFOLIO */
+.groups-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;}
+.gcard{background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:12px;cursor:pointer;transition:border-color .15s;}
+.gcard:hover{border-color:var(--green);}
+.gcard-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.gcard-name{font-family:'Fraunces',serif;font-size:14px;font-weight:700;display:flex;align-items:center;gap:5px;}
+.gcard-total{font-size:15px;font-weight:500;color:var(--green);}
+.gcard-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:8px;}
+.gstat{background:var(--surface);border-radius:4px;padding:5px;text-align:center;}
+.gstat-v{font-size:13px;}
+.gstat-l{font-size:8px;color:var(--muted);text-transform:uppercase;margin-top:1px;}
+.btag{display:inline-block;padding:2px 5px;border-radius:2px;border:1px solid var(--border);margin:1px;font-size:9px;cursor:pointer;}
+.btag:hover{border-color:var(--green);}
+.btag.fossil{border-color:rgba(249,115,22,.4);color:var(--orange);}
+.btag.green{border-color:rgba(74,222,128,.3);color:var(--green);}
+
+/* MARKET */
+.market-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;margin-bottom:16px;}
+.mcard{background:var(--surface2);border-width:1px 1px 1px 3px;border-style:solid;border-radius:8px;padding:12px;}
+.mcard.fossil{border-color:var(--border) var(--border) var(--border) var(--orange);}
+.mcard.green{border-color:var(--border) var(--border) var(--border) var(--green);}
+.mcard.sold{opacity:.45;border-left-color:var(--muted2);}
+.mcard-nr{font-size:9px;color:var(--muted2);}
+.mcard-name{font-family:'Fraunces',serif;font-size:14px;font-weight:700;margin:3px 0;line-height:1.2;}
+.mcard-addr{font-size:9px;color:var(--muted);margin-bottom:8px;}
+.mcard-stats{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:8px;}
+.mstat{background:var(--surface);border-radius:3px;padding:5px;text-align:center;}
+.mstat-v{font-size:13px;font-weight:500;}
+.mstat-l{font-size:8px;color:var(--muted);}
+.mcard-feat{font-size:9px;color:var(--muted2);margin-bottom:8px;}
+.mcard-foot{display:flex;justify-content:space-between;align-items:center;}
+.sales-log{display:flex;flex-direction:column;gap:5px;}
+.sale-row{display:flex;gap:8px;align-items:center;padding:7px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;font-size:10px;}
+
+/* BUILDINGS */
+.bsearch{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:5px;font-family:'DM Mono',monospace;font-size:12px;margin-bottom:8px;}
+.bsearch:focus{outline:none;border-color:var(--green);}
+.fpills{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;}
+.fpill{padding:3px 9px;border-radius:20px;border:1px solid var(--border);font-size:9px;color:var(--muted);cursor:pointer;transition:all .15s;}
+.fpill:hover,.fpill.on{border-color:var(--green);color:var(--green);background:rgba(74,222,128,.05);}
+.bldg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:7px;}
+.bcard{background:var(--surface2);border:1px solid var(--border);border-left-width:3px;border-radius:5px;padding:9px;cursor:pointer;transition:opacity .15s;}
+.bcard:hover{opacity:.8;}
+.bcard.fossil{border-left-color:var(--orange);}
+.bcard.grn{border-left-color:var(--green);}
+.bcard.hp{border-left-color:var(--purple);}
+.bc-nr{font-size:8px;color:var(--muted2);}
+.bc-name{font-weight:500;margin:3px 0;font-size:11px;line-height:1.2;}
+.bc-addr{font-size:9px;color:var(--muted);margin-bottom:5px;}
+.bc-chips{display:flex;gap:3px;flex-wrap:wrap;}
+.bchip{font-size:9px;padding:1px 4px;border-radius:2px;background:var(--surface3);}
+.bchip.ecrit{background:rgba(239,68,68,.15);color:var(--red);}
+.bchip.ewarn{background:rgba(249,115,22,.15);color:var(--orange);}
+.bchip.fos{background:rgba(249,115,22,.1);color:var(--orange);}
+.bchip.grn{background:rgba(74,222,128,.1);color:var(--green);}
+.bc-feat{font-size:8px;color:var(--muted2);margin-top:4px;}
+
+/* CO2 ROUND */
+.co2-forms-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;}
+.co2-gblock{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:11px;}
+.co2-gname{font-family:'Fraunces',serif;font-size:13px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:5px;}
+.co2-fields{display:grid;grid-template-columns:1fr 1fr;gap:5px;}
+.co2-field label{font-size:8px;color:var(--muted);text-transform:uppercase;display:block;margin-bottom:2px;}
+.co2-field input{width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:4px 7px;border-radius:3px;font-family:'DM Mono',monospace;font-size:12px;}
+.co2-field input:focus{outline:none;border-color:var(--green);}
+.co2-gtotal{margin-top:7px;font-size:10px;display:flex;justify-content:space-between;padding-top:7px;border-top:1px solid var(--border);}
+.co2-summary{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:12px;margin-top:12px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;text-align:center;}
+.cs-val{font-family:'Fraunces',serif;font-size:22px;font-weight:700;line-height:1;}
+.cs-lbl{font-size:8px;color:var(--muted);text-transform:uppercase;margin-top:3px;}
+
+/* RIGHT PANEL */
+.right-panel{background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;min-height:0;overflow:hidden;}
+.rp-hdr{padding:10px 12px;border-bottom:1px solid var(--border);font-size:8px;text-transform:uppercase;letter-spacing:2px;color:var(--muted2);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
+.elog{flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:4px;min-height:0;}
+.eentry{background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:6px 8px;font-size:10px;line-height:1.5;animation:fadeUp .2s ease;}
+.etype{font-size:8px;text-transform:uppercase;letter-spacing:1px;margin-bottom:1px;}
+.etype.news{color:var(--blue);}
+.etype.klima{color:var(--orange);}
+.etype.co2{color:var(--red);}
+.etype.sys{color:var(--muted2);}
+.etime{font-size:8px;color:var(--muted2);margin-top:2px;}
+.quick-co2{border-top:1px solid var(--border);background:var(--surface2);padding:9px 11px;flex-shrink:0;}
+.qco2-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px;}
+.qrow{display:flex;flex-direction:column;gap:2px;}
+.qrow label{font-size:8px;color:var(--muted2);}
+.qrow input{background:var(--surface);border:1px solid var(--border);color:var(--text);padding:4px 6px;border-radius:3px;font-family:'DM Mono',monospace;font-size:12px;width:100%;}
+.qrow input:focus{outline:none;border-color:var(--green);}
+.qtotal{display:flex;justify-content:space-between;align-items:center;background:var(--surface);border-radius:4px;padding:5px 8px;margin-bottom:5px;font-size:10px;}
+
+/* MODALS */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:200;align-items:center;justify-content:center;}
+.modal-bg.open{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;max-width:460px;width:92%;max-height:85vh;overflow-y:auto;position:relative;}
+.modal-title{font-family:'Fraunces',serif;font-size:18px;font-weight:700;margin-bottom:12px;}
+.modal-close{position:absolute;top:12px;right:12px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:22px;line-height:1;}
+.modal-close:hover{color:var(--text);}
+.price-display{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:11px;margin-bottom:12px;}
+.price-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center;}
+.price-num{font-size:18px;font-weight:500;line-height:1;}
+.price-sub{font-size:9px;color:var(--muted);margin-top:2px;}
+
+/* ══════════════════════════════════════════
+   GROUP VIEW (mobile-optimised)
+══════════════════════════════════════════ */
+#screen-group{background:var(--bg);}
+.gv-header{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.gv-name{font-family:'Fraunces',serif;font-size:18px;font-weight:700;}
+.gv-gc{font-size:14px;color:var(--yellow);font-weight:500;}
+
+/* PHASE INDICATOR */
+.phase-indicator{background:var(--surface2);margin:12px;border-radius:8px;border:1px solid var(--border);overflow:hidden;}
+.pi-phase{background:var(--green);color:#0d0f0e;padding:10px 14px;font-size:11px;font-weight:500;display:flex;align-items:center;gap:8px;}
+.pi-desc{padding:10px 14px;font-size:11px;color:var(--muted);line-height:1.6;}
+
+/* THERMO MINI */
+.thermo-mini{display:flex;gap:10px;align-items:center;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin:0 12px 12px;}
+.thermo-mini-tube{width:18px;height:80px;background:var(--surface3);border:1px solid var(--border);border-radius:9px;position:relative;overflow:hidden;flex-shrink:0;}
+.thermo-mini-fill{position:absolute;bottom:0;left:0;right:0;border-radius:0 0 8px 8px;transition:height .7s,background .7s;}
+.thermo-mini-info{flex:1;}
+.tmi-temp{font-family:'Fraunces',serif;font-size:24px;font-weight:900;line-height:1;}
+.tmi-co2{font-size:11px;color:var(--muted);margin-top:4px;}
+.tmi-year{font-size:10px;color:var(--muted2);}
+
+/* CURRENT CARD in group view */
+.gv-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px;margin:0 12px 12px;position:relative;overflow:hidden;}
+.gv-card::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
+.gv-card.news::after{background:var(--blue);}
+.gv-card.gelb::after{background:var(--yellow);}
+.gv-card.orange::after{background:var(--orange);}
+.gv-card.rot::after{background:var(--red);}
+.gv-card-badge{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px;}
+.gv-card-title{font-family:'Fraunces',serif;font-size:17px;font-weight:700;margin-bottom:6px;line-height:1.2;}
+.gv-card-text{font-size:11px;color:var(--muted);line-height:1.7;}
+
+/* PORTFOLIO mini */
+.gv-section{margin:0 12px 12px;}
+.gv-section-title{font-size:9px;text-transform:uppercase;letter-spacing:2px;color:var(--muted2);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border);}
+.gv-bldg{background:var(--surface2);border:1px solid var(--border);border-left-width:3px;border-radius:6px;padding:10px 12px;margin-bottom:6px;}
+.gv-bldg.fossil{border-left-color:var(--orange);}
+.gv-bldg.green{border-left-color:var(--green);}
+.gv-bldg-name{font-size:12px;font-weight:500;margin-bottom:3px;}
+.gv-bldg-sub{font-size:10px;color:var(--muted);}
+.gv-bldg-chips{display:flex;gap:4px;flex-wrap:wrap;margin-top:5px;}
+.gv-chip{font-size:9px;padding:1px 5px;border-radius:2px;background:var(--surface3);}
+.gv-chip.ecrit{background:rgba(239,68,68,.15);color:var(--red);}
+.gv-chip.fos{background:rgba(249,115,22,.1);color:var(--orange);}
+.gv-chip.grn{background:rgba(74,222,128,.1);color:var(--green);}
+
+/* MARKET in group view */
+.gv-mcard{background:var(--surface2);border:1px solid var(--border);border-left-width:3px;border-radius:8px;padding:12px;margin-bottom:8px;}
+.gv-mcard.fossil{border-left-color:var(--orange);}
+.gv-mcard.grn{border-left-color:var(--green);}
+.gv-mcard.sold{opacity:.4;}
+.gv-mcard-name{font-family:'Fraunces',serif;font-size:15px;font-weight:700;margin-bottom:4px;}
+.gv-mcard-sub{font-size:10px;color:var(--muted);margin-bottom:8px;}
+.gv-mcard-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:8px;}
+.gv-ms{background:var(--surface);border-radius:3px;padding:5px;text-align:center;}
+.gv-ms-v{font-size:13px;font-weight:500;}
+.gv-ms-l{font-size:8px;color:var(--muted);}
+
+/* ACTIONS */
+.gv-actions{padding:12px;background:var(--surface);border-top:1px solid var(--border);flex-shrink:0;}
+.gv-phase-actions{display:flex;flex-direction:column;gap:8px;}
+.gv-action-box{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;}
+.gv-action-title{font-size:11px;font-weight:500;margin-bottom:8px;color:var(--text);}
+.gv-bid-row{display:flex;gap:8px;align-items:flex-end;}
+.gv-bid-row .field{flex:1;margin-bottom:0;}
+.gv-stat-row{display:flex;gap:8px;margin-bottom:8px;}
+.gv-stat{flex:1;background:var(--surface);border-radius:4px;padding:8px;text-align:center;}
+.gv-stat-v{font-size:18px;font-weight:500;}
+.gv-stat-l{font-size:9px;color:var(--muted);text-transform:uppercase;}
+
+/* READY BUTTON */
+.ready-btn{width:calc(100% - 24px);margin:0 12px 12px;padding:14px;font-size:14px;font-weight:500;border-radius:8px;background:var(--green);color:#0d0f0e;border:none;cursor:pointer;font-family:'DM Mono',monospace;transition:all .2s;}
+.ready-btn.is-ready{background:var(--green-dim);color:var(--green);border:1px solid var(--green);}
+.ready-btn:disabled{opacity:.4;cursor:not-allowed;}
+
+/* GROUP JOIN SCREEN */
+#screen-join{align-items:center;justify-content:center;}
+.join-box{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:28px;max-width:360px;width:90%;text-align:center;}
+.join-title{font-family:'Fraunces',serif;font-size:20px;margin-bottom:6px;}
+.join-sub{font-size:11px;color:var(--muted);margin-bottom:20px;line-height:1.6;}
+.join-groups{display:flex;flex-direction:column;gap:8px;margin-bottom:16px;}
+.join-group-btn{display:flex;align-items:center;gap:10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:12px 14px;cursor:pointer;transition:border-color .15s;text-align:left;}
+.join-group-btn:hover{border-color:var(--green);}
+.join-group-btn .jdot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.join-group-btn .jname{font-size:13px;flex:1;}
+.join-group-btn .jgc{font-size:11px;color:var(--yellow);}
+.join-group-btn .jstatus{font-size:10px;color:var(--green);}
+.join-group-btn.taken{opacity:.4;cursor:not-allowed;}
+</style>
+</head>
+<body>
+
+<!-- ══ CONNECTING ══ -->
+<div id="screen-connect" class="screen active">
+  <div class="connect-box">
+    <div class="logo" style="font-size:28px;margin-bottom:16px">Immo<em>Game</em></div>
+    <div class="spinner"></div>
+    <div style="font-size:12px;color:var(--muted)" id="connect-msg">Verbinde mit Firebase…</div>
+  </div>
+</div>
+
+<!-- ══ JOIN (Gruppe wählen) ══ -->
+<div id="screen-join" class="screen">
+  <div class="join-box">
+    <div class="logo" style="font-size:24px;margin-bottom:4px">Immo<em>Game</em></div>
+    <div class="join-title" style="margin-top:12px">Gruppe wählen</div>
+    <div class="join-sub">Wähle deine Gruppe um dem laufenden Spiel beizutreten.</div>
+    <div class="join-groups" id="join-groups-list"></div>
+    <div style="font-size:10px;color:var(--muted2)">Spielleiter: <a href="?" style="color:var(--green)">Dashboard öffnen →</a></div>
+  </div>
+</div>
+
+<!-- ══ ONBOARDING (Spielleiter) ══ -->
+<div id="screen-onboarding" class="screen">
+  <div class="onb-wrap">
+    <div class="onb-header">
+      <div class="logo">Immo<em>Game</em></div>
+      <div style="font-size:10px;color:var(--muted)">Spielleiter-Setup · Edition 2025</div>
+    </div>
+
+    <div class="onb-grid">
+      <!-- LEFT -->
+      <div class="onb-left">
+        <div style="margin-bottom:24px">
+          <div class="section-title">Gruppen anlegen</div>
+          <div class="groups-list" id="onb-groups"></div>
+          <div class="add-row">
+            <input type="text" class="input" id="onb-gname" placeholder="Gruppenname…" style="flex:2">
+            <input type="number" class="input" id="onb-ggc" value="10" min="1" max="99" style="flex:0.6" title="Startkapital GC">
+            <select class="input" id="onb-gprofile" style="flex:1.2">
+              <option value="">— Profil —</option>
+              <option>Shareholder</option><option>Treehugger</option><option>Balanced</option>
+              <option>Enkelfähig</option><option>Risikokapital</option><option>Staatsuntern.</option>
+              <option>Familienuntern.</option><option>Opportunist</option><option>ESG-Pioneer</option>
+              <option>Value-Add</option>
+            </select>
+            <button class="btn btn-primary" style="padding:8px 14px" onclick="onbAdd()">+</button>
+          </div>
+          <div style="font-size:9px;color:var(--muted2);margin-top:5px">Enter oder + · Empfohlen 5–10 Gruppen</div>
+        </div>
+
+        <div style="margin-bottom:20px">
+          <div class="section-title">Spielparameter</div>
+          <div class="input-row">
+            <div class="field">
+              <label class="label">Startjahr</label>
+              <select class="input" id="onb-year">
+                <option value="2017">2017 (+1,0°C)</option>
+                <option value="2025" selected>2025 (+1,3°C)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="label">Max. Runden</label>
+              <input type="text" class="input" id="onb-maxrnd" value="?" placeholder="? = geheim">
+            </div>
+          </div>
+          <div class="input-row">
+            <div class="field">
+              <label class="label">CO₂-Budget je Gruppe</label>
+              <input type="number" class="input" id="onb-co2pg" value="70" min="10" max="200">
+            </div>
+            <div class="field">
+              <label class="label">Starttemperatur</label>
+              <select class="input" id="onb-temp">
+                <option value="10">+1,0°C (2017)</option>
+                <option value="13" selected>+1,3°C (2025)</option>
+                <option value="15">+1,5°C (2030)</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label class="label">Klimakarten</label>
+            <div class="toggle-group">
+              <div class="topt active" onclick="topt(this,'klima')" data-v="alle">Alle ab +1,5°C</div>
+              <div class="topt" onclick="topt(this,'klima')" data-v="ab20">Nur ab +2,0°C</div>
+              <div class="topt" onclick="topt(this,'klima')" data-v="keine">Keine</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="params-grid" id="onb-summary">
+          <div class="param-box"><div class="pl">Gruppen</div><div class="pv" id="s-grp">0</div></div>
+          <div class="param-box"><div class="pl">CO₂ gesamt</div><div class="pv" id="s-co2">0</div></div>
+          <div class="param-box"><div class="pl">Starttemp</div><div class="pv" style="color:var(--warn)" id="s-temp">+1,3°C</div></div>
+          <div class="param-box"><div class="pl">Startkapital</div><div class="pv" id="s-gc">0 GC</div></div>
+        </div>
+      </div>
+
+      <!-- RIGHT: SETTINGS -->
+      <div class="onb-right">
+        <div class="section-title" style="display:flex;justify-content:space-between;align-items:center">
+          <span>Spielregeln & Kosten</span>
+          <div style="display:flex;gap:6px;align-items:center">
+            <button class="btn btn-sm" onclick="resetSettings()">↺ Standard</button>
+            <button class="btn btn-sm btn-primary" onclick="saveSettings()">💾 Speichern</button>
+            <span class="save-ok" id="save-ok">✓</span>
+          </div>
+        </div>
+        <div class="stabs">
+          <div class="stab active" onclick="switchStab('simple',this)">Einfach</div>
+          <div class="stab" onclick="switchStab('profi',this)">Profi</div>
+          <div class="stab" onclick="switchStab('start',this)">Startgebäude</div>
+        </div>
+
+        <!-- SIMPLE -->
+        <div class="scontent active" id="s-simple">
+          <table class="ctable"><thead><tr><th>Parameter</th><th>Wert</th><th>Einheit</th></tr></thead><tbody>
+            <tr><td class="rl"><strong>Gebäude kaufen</strong></td><td><input type="number" id="c_buy" value="20"></td><td>GC</td></tr>
+            <tr><td class="rl"><strong>Basispreis Verkauf</strong></td><td><input type="number" id="c_sell_base" value="15"></td><td>GC</td></tr>
+            <tr><td class="rl"><strong>Transition-Bonus</strong></td><td><input type="number" id="c_trans_bonus" value="8"></td><td>GC</td></tr>
+            <tr><td class="rl"><strong>Miete je Gebäude</strong></td><td><input type="number" id="c_rent" value="1"></td><td>GC/Runde</td></tr>
+            <tr><td class="rl"><strong>Miete Zukunftssicher</strong></td><td><input type="number" id="c_rent_zk" value="1"></td><td>GC extra</td></tr>
+            <tr><td class="rl"><strong>Capex Kosten</strong></td><td><input type="number" id="c_capex" value="3"></td><td>GC</td></tr>
+            <tr><td class="rl"><strong>Redevelopment</strong></td><td><input type="number" id="c_redev" value="10"></td><td>GC</td></tr>
+            <tr><td class="rl"><strong>Abriss & Neubau</strong></td><td><input type="number" id="c_neubau" value="20"></td><td>GC</td></tr>
+            <tr><td class="rl"><strong>ESG aufdecken</strong></td><td><input type="number" id="c_esg_rev" value="1"></td><td>GC</td></tr>
+            <tr><td class="rl"><strong>ESG umsetzen</strong></td><td><input type="number" id="c_esg_impl" value="2"></td><td>GC</td></tr>
+            <tr><td class="rl"><strong>Marketing 1 Rep</strong></td><td><input type="number" id="c_marketing" value="1"></td><td>GC</td></tr>
+            <tr><td class="rl"><strong>Zeit je Phase</strong></td><td><input type="number" id="c_phase_time" value="0" min="0"></td><td>Min (0=kein Limit)</td></tr>
+          </tbody></table>
+        </div>
+
+        <!-- PROFI -->
+        <div class="scontent" id="s-profi">
+          <table class="ctable"><thead><tr><th>Maßnahme</th><th>GC</th><th>CO₂</th><th>Runden</th></tr></thead><tbody>
+            <tr><td colspan="4" style="color:var(--muted2);padding-top:7px;font-size:9px">— Baumaßnahmen —</td></tr>
+            <tr><td class="rl">Capex</td><td><input id="p_capex_gc" value="3"></td><td><input id="p_capex_co2" value="1"></td><td>—</td></tr>
+            <tr><td class="rl">Redevelopment</td><td><input id="p_redev_gc" value="10"></td><td><input id="p_redev_co2" value="7"></td><td><input id="p_redev_rnd" value="1"></td></tr>
+            <tr><td class="rl">Abriss & Neubau</td><td><input id="p_neubau_gc" value="20"></td><td><input id="p_neubau_co2" value="36"></td><td><input id="p_neubau_rnd" value="2"></td></tr>
+            <tr><td class="rl">Reparatur 1SP</td><td><input id="p_repair_gc" value="1"></td><td><input id="p_repair_co2" value="1"></td><td>—</td></tr>
+            <tr><td colspan="4" style="color:var(--muted2);padding-top:7px;font-size:9px">— Betrieb / CO₂ —</td></tr>
+            <tr><td class="rl">Betrieb je Gebäude</td><td>—</td><td><input id="p_betrieb_co2" value="1"></td><td>/Runde</td></tr>
+            <tr><td class="rl">Fossile Heizung extra</td><td>—</td><td><input id="p_fossil_co2" value="1"></td><td>/Runde</td></tr>
+            <tr><td colspan="4" style="color:var(--muted2);padding-top:7px;font-size:9px">— Verkauf —</td></tr>
+            <tr><td class="rl">Basis</td><td><input id="p_s_base" value="15"></td><td>—</td><td>—</td></tr>
+            <tr><td class="rl">+ je Capex (max.3)</td><td><input id="p_s_capex" value="3"></td><td>—</td><td>—</td></tr>
+            <tr><td class="rl">+ Redevelopment</td><td><input id="p_s_redev" value="10"></td><td>—</td><td>—</td></tr>
+            <tr><td class="rl">+ Neubau</td><td><input id="p_s_neubau" value="20"></td><td>—</td><td>—</td></tr>
+            <tr><td class="rl">Transition-Bonus</td><td><input id="p_trans" value="8"></td><td>—</td><td>—</td></tr>
+            <tr><td colspan="4" style="color:var(--muted2);padding-top:7px;font-size:9px">— Kredite —</td></tr>
+            <tr><td class="rl">Kredit Redev.</td><td><input id="p_kr_redev" value="8"></td><td>—</td><td>1 GC/Runde</td></tr>
+            <tr><td class="rl">Kredit Neubau</td><td><input id="p_kr_neubau" value="16"></td><td>—</td><td>2 GC/Runde</td></tr>
+            <tr><td colspan="4" style="color:var(--muted2);padding-top:7px;font-size:9px">— Energie-Schwellen (kWh/m²) —</td></tr>
+            <tr><td class="rl">Schwelle ab +1,6°C</td><td><input id="p_t1" value="170"></td><td colspan="2">→ keine Miete</td></tr>
+            <tr><td class="rl">Schwelle ab +1,9°C</td><td><input id="p_t2" value="130"></td><td colspan="2">→ keine Miete</td></tr>
+            <tr><td class="rl">Schwelle ab +2,0°C</td><td><input id="p_t3" value="100"></td><td colspan="2">→ keine Miete</td></tr>
+          </tbody></table>
+        </div>
+
+        <!-- START BUILDINGS -->
+        <div class="scontent" id="s-start">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:14px;line-height:1.7">
+            Wie viele Gebäude erhält jede Gruppe zu Spielbeginn?
+          </div>
+          <table class="ctable"><thead><tr><th>Parameter</th><th>Wert</th></tr></thead><tbody>
+            <tr><td class="rl"><strong>Startgebäude je Gruppe</strong></td><td><input type="number" id="p_start_bldg" value="3" min="0" max="10"></td></tr>
+          </tbody></table>
+          <div style="margin-top:16px">
+            <label class="label">Zuteilungsmodus</label>
+            <div class="toggle-group">
+              <div class="topt active" onclick="topt(this,'startmode')" data-v="random">Zufällig aus Stapel</div>
+              <div class="topt" onclick="topt(this,'startmode')" data-v="fixed">Spielleiter weist zu</div>
+            </div>
+          </div>
+          <div style="margin-top:14px;font-size:10px;color:var(--muted);line-height:1.7">
+            <strong style="color:var(--text)">Zufällig:</strong> Beim Spielstart werden automatisch je Gruppe <span id="start-bldg-preview">3</span> Gebäude aus dem gemischten Stapel gezogen.<br>
+            <strong style="color:var(--text)">Spielleiter weist zu:</strong> Gruppen starten ohne Gebäude, der Spielleiter teilt sie manuell zu.
+          </div>
+          <div style="margin-top:16px">
+            <label class="label">Phase-Timer (Minuten, 0 = kein Limit)</label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <div class="field"><label class="label" style="font-size:9px">Phase 1 News</label><input type="number" class="input" id="pt_1" value="0" min="0"></div>
+              <div class="field"><label class="label" style="font-size:9px">Phase 2 Einnahmen</label><input type="number" class="input" id="pt_2" value="0" min="0"></div>
+              <div class="field"><label class="label" style="font-size:9px">Phase 3 Transakt.</label><input type="number" class="input" id="pt_3" value="5" min="0"></div>
+              <div class="field"><label class="label" style="font-size:9px">Phase 4 Baumaßn.</label><input type="number" class="input" id="pt_4" value="5" min="0"></div>
+              <div class="field"><label class="label" style="font-size:9px">Phase 5 Aktionen</label><input type="number" class="input" id="pt_5" value="3" min="0"></div>
+              <div class="field"><label class="label" style="font-size:9px">Phase 6 CO₂</label><input type="number" class="input" id="pt_6" value="2" min="0"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="onb-footer">
+    <div class="launch-info" id="launch-info">Noch keine Gruppen angelegt.</div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="btn btn-sm" onclick="loadPreset()">📂 Preset laden</button>
+      <button class="btn btn-primary" id="launch-btn" disabled onclick="launchGame()" style="font-size:13px;padding:11px 24px">Spiel starten →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ DASHBOARD (Spielleiter) ══ -->
+<div id="screen-dashboard" class="screen">
+
+  <div class="dash-hdr">
+    <div class="dash-logo">Immo<em>Game</em></div>
+    <div class="ticker">
+      <div class="tick-item"><div class="tick-val" id="tk-rnd" style="color:var(--green)">1</div><div class="tick-lbl">Runde</div></div>
+      <div class="tick-div"></div>
+      <div class="tick-item"><div class="tick-val" id="tk-yr">2025</div><div class="tick-lbl">Jahr</div></div>
+      <div class="tick-div"></div>
+      <div class="tick-item"><div class="tick-val" id="tk-temp" style="color:var(--warn)">+1,3°C</div><div class="tick-lbl">Temperatur</div></div>
+      <div class="tick-div"></div>
+      <div class="tick-item"><div class="tick-val" id="tk-co2" style="color:var(--green)">210</div><div class="tick-lbl">CO₂-Budget</div></div>
+      <div class="tick-div"></div>
+      <div class="tick-item"><div class="tick-val" id="tk-maxrnd" style="color:var(--muted)">?</div><div class="tick-lbl">Max.Runden</div></div>
+    </div>
+    <div style="display:flex;gap:7px;align-items:center">
+      <div style="font-size:9px;color:var(--muted2)" id="join-url-display"></div>
+      <button class="btn btn-sm" onclick="prevRound()">← Zurück</button>
+      <button class="btn btn-sm btn-primary" onclick="nextRound()">Runde abschließen →</button>
+      <button class="btn btn-sm" onclick="goSettings()" title="Einstellungen">⚙</button>
+    </div>
+  </div>
+
+  <!-- PHASE BAR -->
+  <div class="phase-bar" id="phase-bar">
+    <div class="phase-step active" onclick="setPhase(1)" data-p="1"><span class="pnum">1</span>Newsticker</div>
+    <div class="phase-step" onclick="setPhase(2)" data-p="2"><span class="pnum">2</span>Einnahmen &amp; Zinsen</div>
+    <div class="phase-step" onclick="setPhase(3)" data-p="3"><span class="pnum">3</span>Transaktionen</div>
+    <div class="phase-step" onclick="setPhase(4)" data-p="4"><span class="pnum">4</span>Baumaßnahmen</div>
+    <div class="phase-step" onclick="setPhase(5)" data-p="5"><span class="pnum">5</span>Weitere Aktionen</div>
+    <div class="phase-step" onclick="setPhase(6)" data-p="6"><span class="pnum">6</span>CO₂-Budget</div>
+  </div>
+
+  <!-- READY BAR -->
+  <div class="ready-bar" id="ready-bar">
+    <span class="ready-lbl">Bereit:</span>
+    <!-- chips rendered dynamically -->
+  </div>
+
+  <!-- TIMER BAR -->
+  <div id="timer-bar" style="display:none;background:var(--surface2);border-bottom:1px solid var(--border);padding:6px 18px;display:flex;align-items:center;gap:12px;flex-shrink:0">
+    <span style="font-size:10px;color:var(--muted)">Phase-Timer:</span>
+    <span style="font-family:'Fraunces',serif;font-size:18px;font-weight:700;color:var(--yellow)" id="timer-display">5:00</span>
+    <button class="btn btn-sm" onclick="toggleTimer()">⏸</button>
+  </div>
+
+  <div class="dash-main">
+
+    <!-- LEFT -->
+    <div class="left-panel">
+      <div>
+        <div class="plabel">Welt-Thermometer</div>
+        <div class="thermo-wrap">
+          <div class="thermo-tube"><div class="thermo-fill" id="d-fill"></div></div>
+          <div class="thermo-labels" id="d-labels"></div>
+        </div>
+      </div>
+      <div class="readout">
+        <div class="plabel">Temperatur</div>
+        <div class="readout-big" id="d-temp">+1,3°C</div>
+        <div class="readout-sub" id="d-temp-sub">Jahr 2025 · 443 ppm</div>
+      </div>
+      <div class="readout">
+        <div class="plabel">CO₂-Budget gesamt</div>
+        <div class="readout-big" id="d-co2" style="color:var(--green)">210</div>
+        <div class="readout-sub" id="d-co2-sub">3 × 70 CO₂</div>
+      </div>
+      <div>
+        <div class="plabel">Manuell anpassen</div>
+        <div class="range-wrap">
+          <input type="range" min="10" max="30" value="13" id="d-slider" oninput="manualTemp(this.value)">
+          <div class="range-lbl"><span>+1,0°C</span><span>+2,0°C</span><span>+3,0°C</span></div>
+        </div>
+      </div>
+      <div>
+        <div class="plabel">Klimaeffekte</div>
+        <div class="effect-card" id="d-effects"></div>
+      </div>
+    </div>
+
+    <!-- CENTER -->
+    <div class="center-panel">
+      <div class="ctabs">
+        <div class="ctab active" onclick="ctab('news',this)">Newsticker</div>
+        <div class="ctab" onclick="ctab('market',this)">🏢 Markt</div>
+        <div class="ctab" onclick="ctab('portfolio',this)">Portfolio</div>
+        <div class="ctab" onclick="ctab('buildings',this)">Gebäude</div>
+        <div class="ctab" onclick="ctab('co2',this)">CO₂</div>
+      </div>
+
+      <!-- NEWSTICKER -->
+      <div class="ctab-body active" id="ctab-news">
+        <div class="draw-row">
+          <button class="btn btn-primary" onclick="drawCard('news')">🗞 Newsticker ziehen</button>
+          <button class="btn" onclick="drawCard('klima')" id="klima-btn" style="display:none">⚡ Klimakarte</button>
+          <button class="btn" onclick="reshuffleNews()">↺ Mischen</button>
+        </div>
+        <div id="d-cur-card">
+          <div style="padding:32px;text-align:center;color:var(--muted);border:1px dashed var(--border);border-radius:8px">Newsticker ziehen um Runde zu starten</div>
+        </div>
+        <div style="margin-top:14px">
+          <div class="plabel" style="margin-bottom:7px">Verlauf</div>
+          <div class="hist-list" id="d-hist"></div>
+        </div>
+      </div>
+
+      <!-- MARKET -->
+      <div class="ctab-body" id="ctab-market">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div>
+            <div class="plabel" style="margin:0">Transaktionsmarkt — Runde <span id="mkt-rnd">1</span></div>
+            <div style="font-size:9px;color:var(--muted);margin-top:3px">1 Gebäude je Gruppe offen · Min. 20 GC + Überbieten</div>
+          </div>
+          <div style="display:flex;gap:7px">
+            <button class="btn btn-sm" onclick="refreshMarket()">↺ Neu aufdecken</button>
+            <button class="btn btn-sm btn-primary" onclick="openSellModal()">📤 Verkaufen</button>
+          </div>
+        </div>
+        <div class="market-grid" id="d-market-grid"></div>
+        <div style="border-top:1px solid var(--border);padding-top:14px">
+          <div class="plabel" style="margin-bottom:8px">Verkäufe dieser Runde</div>
+          <div class="sales-log" id="d-sales-log">
+            <div style="color:var(--muted2);font-size:11px;padding:8px">Noch keine Verkäufe</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PORTFOLIO -->
+      <div class="ctab-body" id="ctab-portfolio">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div class="plabel" style="margin:0">Gruppen & Portfolios</div>
+          <button class="btn btn-sm btn-primary" onclick="openAddGroupModal()">+ Gruppe</button>
+        </div>
+        <div class="groups-grid" id="d-groups-grid"></div>
+      </div>
+
+      <!-- BUILDINGS -->
+      <div class="ctab-body" id="ctab-buildings">
+        <input type="text" class="bsearch" id="d-bsearch" placeholder="Gebäude, Adresse, Heizsystem…" oninput="filterBldgs(this.value)">
+        <div class="fpills" id="d-pills">
+          <span class="fpill on" onclick="fp('')">Alle</span>
+          <span class="fpill" onclick="fp('fossil')">🔴 Fossil</span>
+          <span class="fpill" onclick="fp('fw')">🟢 Fernwärme</span>
+          <span class="fpill" onclick="fp('wp')">🟣 Wärmepumpe</span>
+          <span class="fpill" onclick="fpE(170)">E&gt;170</span>
+          <span class="fpill" onclick="fpE(130)">E&gt;130</span>
+          <span class="fpill" onclick="fpE(100)">E&gt;100</span>
+          <span class="fpill" onclick="fp('denkmal')">Denkmal</span>
+          <span class="fpill" onclick="fp('hochhaus')">Hochhaus</span>
+        </div>
+        <div class="bldg-grid" id="d-bldg-grid"></div>
+      </div>
+
+      <!-- CO2 -->
+      <div class="ctab-body" id="ctab-co2">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div class="plabel" style="margin:0">CO₂-Abrechnung — Runde <span id="co2-rnd-lbl">1</span></div>
+          <button class="btn btn-sm btn-primary" onclick="bookRoundCO2()">✓ Buchen &amp; Temperatur</button>
+        </div>
+        <div class="co2-forms-grid" id="d-co2-forms"></div>
+        <div class="co2-summary" id="co2-smry">
+          <div><div class="cs-val" id="cs-total" style="color:var(--red)">0</div><div class="cs-lbl">CO₂ diese Runde</div></div>
+          <div><div class="cs-val" id="cs-after" style="color:var(--green)">0</div><div class="cs-lbl">Budget danach</div></div>
+          <div><div class="cs-val" id="cs-temp">+1,3°C</div><div class="cs-lbl">neue Temperatur</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div class="right-panel">
+      <div class="rp-hdr">
+        <span>Ereignisprotokoll</span>
+        <button class="btn btn-sm" style="padding:2px 7px;font-size:9px" onclick="document.getElementById('d-elog').innerHTML=''">löschen</button>
+      </div>
+      <div class="elog" id="d-elog"></div>
+      <div class="quick-co2">
+        <div class="plabel" style="margin-bottom:6px">Schnell-CO₂</div>
+        <div class="qco2-grid">
+          <div class="qrow"><label>Betrieb</label><input type="number" id="qc_bet" value="0" min="0" oninput="qTotal()"></div>
+          <div class="qrow"><label>Fossile extra</label><input type="number" id="qc_fos" value="0" min="0" oninput="qTotal()"></div>
+          <div class="qrow"><label>Capex CO₂</label><input type="number" id="qc_cap" value="0" min="0" oninput="qTotal()"></div>
+          <div class="qrow"><label>Redev. (×7)</label><input type="number" id="qc_red" value="0" min="0" oninput="qTotal()"></div>
+          <div class="qrow"><label>Neubau (×36)</label><input type="number" id="qc_neu" value="0" min="0" oninput="qTotal()"></div>
+          <div class="qrow"><label>Ausgleich (−)</label><input type="number" id="qc_off" value="0" min="0" oninput="qTotal()"></div>
+        </div>
+        <div class="qtotal"><span style="color:var(--muted)">Total</span><span id="qc-tot" style="font-size:14px">0 CO₂</span></div>
+        <button class="btn btn-primary btn-full btn-sm" onclick="quickBook()">Buchen</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ GROUP VIEW (Gruppen-Device) ══ -->
+<div id="screen-group" class="screen">
+  <div class="gv-header">
+    <div>
+      <div style="font-size:9px;color:var(--muted2);margin-bottom:2px">ImmoGame · Gruppen-View</div>
+      <div class="gv-name" id="gv-name">–</div>
+    </div>
+    <div style="text-align:right">
+      <div class="gv-gc" id="gv-gc">– GC</div>
+      <div style="font-size:9px;color:var(--muted2)" id="gv-rep">0 Reputation</div>
+    </div>
+  </div>
+
+  <!-- PHASE INDICATOR -->
+  <div class="phase-indicator" id="gv-phase-box">
+    <div class="pi-phase" id="gv-phase-label">Phase 1 – Newsticker</div>
+    <div class="pi-desc" id="gv-phase-desc">Warte auf den Spielleiter…</div>
+  </div>
+
+  <!-- THERMOMETER MINI + CURRENT CARD -->
+  <div class="thermo-mini">
+    <div class="thermo-mini-tube"><div class="thermo-mini-fill" id="gv-thermo-fill"></div></div>
+    <div class="thermo-mini-info">
+      <div class="tmi-temp" id="gv-temp">+1,3°C</div>
+      <div class="tmi-co2" id="gv-co2-lbl">CO₂-Budget: 210</div>
+      <div class="tmi-year" id="gv-year-lbl">Jahr 2025 · Runde 1</div>
+    </div>
+  </div>
+
+  <!-- CURRENT NEWSTICKER CARD -->
+  <div id="gv-cur-card" style="display:none" class="gv-card news">
+    <div class="gv-card-badge" id="gv-card-badge">Newsticker</div>
+    <div class="gv-card-title" id="gv-card-title">–</div>
+    <div class="gv-card-text" id="gv-card-text">–</div>
+  </div>
+
+  <!-- PHASE-SPECIFIC ACTIONS -->
+  <div class="gv-section" id="gv-actions-section">
+    <div class="gv-section-title" id="gv-actions-title">Aktionen</div>
+    <div id="gv-phase-actions"></div>
+  </div>
+
+  <!-- PORTFOLIO -->
+  <div class="gv-section">
+    <div class="gv-section-title">Mein Portfolio</div>
+    <div id="gv-portfolio"></div>
+  </div>
+
+  <!-- READY BUTTON -->
+  <button class="ready-btn" id="gv-ready-btn" onclick="toggleReady()">✓ Fertig für nächste Phase</button>
+</div>
+
+<!-- MODALS -->
+<div class="modal-bg" id="m-bldg"><div class="modal" style="position:relative">
+  <button class="modal-close" onclick="closeModal('m-bldg')">×</button>
+  <div id="m-bldg-body"></div>
+</div></div>
+
+<div class="modal-bg" id="m-bid"><div class="modal" style="position:relative;max-width:380px">
+  <button class="modal-close" onclick="closeModal('m-bid')">×</button>
+  <div class="modal-title" id="m-bid-title">Kaufen</div>
+  <div style="font-size:10px;color:var(--muted);margin-bottom:12px" id="m-bid-sub"></div>
+  <div class="field"><label class="label">Gruppe</label>
+    <select class="input" id="bid-grp"><option value="">— Gruppe —</option></select></div>
+  <div class="field"><label class="label">Preis (min. 20 GC)</label>
+    <input type="number" class="input" id="bid-price" value="20" min="20"></div>
+  <button class="btn btn-primary btn-full" onclick="executeBid()">Kauf bestätigen</button>
+</div></div>
+
+<div class="modal-bg" id="m-sell"><div class="modal" style="position:relative;max-width:480px">
+  <button class="modal-close" onclick="closeModal('m-sell')">×</button>
+  <div class="modal-title">Gebäude verkaufen</div>
+  <div class="field"><label class="label">Gruppe</label>
+    <select class="input" id="sell-grp" onchange="updateSellBldgs()"><option value="">—</option></select></div>
+  <div class="field"><label class="label">Gebäude</label>
+    <select class="input" id="sell-bldg" onchange="updateSellPrice()"><option value="">—</option></select></div>
+  <div class="price-display" id="sell-price-box" style="display:none">
+    <div class="price-row">
+      <div><div class="price-num" style="color:var(--green)" id="sp-base">15</div><div class="price-sub">Basis GC</div></div>
+      <div><div class="price-num" style="color:var(--yellow)" id="sp-bonus">+0</div><div class="price-sub">Maßnahmen</div></div>
+      <div><div class="price-num" id="sp-total">15</div><div class="price-sub">Verkaufspreis</div></div>
+    </div>
+    <div style="font-size:9px;color:var(--muted);margin-top:6px;text-align:center" id="sp-note"></div>
+  </div>
+  <div class="input-row">
+    <div class="field"><label class="label">Capex-Maßnahmen (0–9)</label>
+      <input type="number" class="input" id="sell-capex" value="0" min="0" max="9" oninput="updateSellPrice()"></div>
+    <div class="field"><label class="label">Größere Maßnahme</label>
+      <select class="input" id="sell-upg" onchange="updateSellPrice()">
+        <option value="none">Keine</option>
+        <option value="redev">Redevelopment (+10)</option>
+        <option value="neubau">Neubau (+20)</option>
+      </select></div>
+  </div>
+  <div class="field"><label class="label">Schadenspunkte (SP)</label>
+    <input type="number" class="input" id="sell-sp" value="0" min="0" oninput="updateSellPrice()"></div>
+  <button class="btn btn-primary btn-full" onclick="executeSell()">Verkauf durchführen</button>
+</div></div>
+
+<div class="modal-bg" id="m-addgrp"><div class="modal" style="position:relative;max-width:360px">
+  <button class="modal-close" onclick="closeModal('m-addgrp')">×</button>
+  <div class="modal-title">Gruppe hinzufügen</div>
+  <div class="field"><label class="label">Name</label><input type="text" class="input" id="ag-name"></div>
+  <div class="field"><label class="label">Startkapital</label><input type="number" class="input" id="ag-gc" value="10"></div>
+  <button class="btn btn-primary btn-full" onclick="addGroupInGame()">Erstellen</button>
+</div></div>
+
+<!-- FIREBASE + APP SCRIPT -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+import { getDatabase, ref, set, get, onValue, update } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+
+// ── FIREBASE CONFIG ──
+const firebaseConfig = {
+  apiKey: "AIzaSyDSjvjoS-YZqBo8xFyhu1Nw7T-NmSB74_U",
+  authDomain: "immogame-a450f.firebaseapp.com",
+  databaseURL: "https://immogame-a450f-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "immogame-a450f",
+  storageBucket: "immogame-a450f.firebasestorage.app",
+  messagingSenderId: "858840257610",
+  appId: "1:858840257610:web:06e3fa8efdaab7a72a82b3"
+};
+
+const fbApp = initializeApp(firebaseConfig);
+const db = getDatabase(fbApp);
+
+// ── GAME DATA ──
+const TEMP_TABLE=[
+  {t:10,budget:100,ppm:'406 ppm',year:'2012'},{t:11,budget:90,ppm:'418 ppm',year:'2017'},
+  {t:12,budget:80,ppm:'431 ppm',year:'2022'},{t:13,budget:70,ppm:'443 ppm',year:'2025'},
+  {t:14,budget:60,ppm:'456 ppm',year:'2027'},{t:15,budget:50,ppm:'468 ppm',year:'2030'},
+  {t:16,budget:40,ppm:'480 ppm',year:'2033'},{t:17,budget:30,ppm:'493 ppm',year:'2037'},
+  {t:18,budget:20,ppm:'505 ppm',year:'2041'},{t:19,budget:10,ppm:'518 ppm',year:'2045'},
+  {t:20,budget:0,ppm:'530 ppm',year:'2050'},{t:21,budget:-10,ppm:'543 ppm',year:'2056'},
+  {t:22,budget:-20,ppm:'555 ppm',year:'2063'},{t:23,budget:-30,ppm:'568 ppm',year:'2070'},
+  {t:24,budget:-40,ppm:'580 ppm',year:'2080'},{t:25,budget:-50,ppm:'593 ppm',year:'2100'},
+  {t:26,budget:-60,ppm:'605 ppm',year:'—'},{t:27,budget:-70,ppm:'618 ppm',year:'—'},
+  {t:28,budget:-80,ppm:'630 ppm',year:'—'},{t:29,budget:-90,ppm:'643 ppm',year:'—'},
+  {t:30,budget:-100,ppm:'655 ppm',year:'—'}
+];
+const EFFECTS=[
+  {t:16,txt:'Energie >170 kWh/m² → keine Miete'},{t:17,txt:'Fossile Heizungen → keine Miete'},
+  {t:18,txt:'Nicht-fossile Heizungen: kein CO₂ im Betrieb'},{t:19,txt:'Energie >130 kWh/m² → keine Miete'},
+  {t:20,txt:'Energie >100 kWh/m² → keine Miete'},{t:21,txt:'Keine neuen CO₂-Emissionen erlaubt'},
+  {t:30,txt:'SPIELENDE'}
+];
+const PHASES=[
+  {n:'Phase 1',lbl:'Newsticker & Klimakarte',desc:'Der Spielleiter zieht eine Newsticker-Karte. Ab +1,5°C zusätzlich Klimakarten. Effekte gelten für alle.'},
+  {n:'Phase 2',lbl:'Einnahmen & Zinsen',desc:'Jede Gruppe erhält +1 GC je vermietetes Gebäude. Zukunftssichere Gebäude (3+ Capex, Redev., Neubau) +1 GC extra. Kreditzinsen werden abgezogen.'},
+  {n:'Phase 3',lbl:'Transaktionen',desc:'Gebäude kaufen und verkaufen. Jede Gruppe kann Gebäude aus dem Transaktionsmarkt kaufen (min. 20 GC) oder eigene Gebäude verkaufen.'},
+  {n:'Phase 4',lbl:'Baumaßnahmen',desc:'Capex-Maßnahmen (3 GC, sofort), Redevelopment (10 GC, 1 Runde) oder Abriss & Neubau (20 GC, 2 Runden) durchführen.'},
+  {n:'Phase 5',lbl:'Weitere Aktionen',desc:'ESG-Strategien kaufen (1+2 GC), Marketing/Reputation (1 GC/Rep.), Schäden reparieren (1 GC/SP), Kredite aufnehmen, CO₂ ausgleichen.'},
+  {n:'Phase 6',lbl:'CO₂-Budget',desc:'Alle CO₂-Emissionen dieser Runde werden verbucht. Das gemeinsame Budget wird reduziert und die Temperatur aktualisiert.'}
+];
+const NEWSTICKER=[
+  {nr:1,t:'Green-Bazooka! (Förderwelle)',x:'Alle Gruppen bekommen Fördergelder: +2 GC diese Runde, +1 GC nächste Runde.'},
+  {nr:2,t:'Handwerkermangel',x:'Alle Baumaßnahmen dauern eine Runde länger.'},
+  {nr:3,t:'Baupreisschock',x:'Alle Baupreise +2 GC diese Runde.'},
+  {nr:4,t:'Transformations-Bonus',x:'Alle Capex-Maßnahmen kosten 1 GC weniger.'},
+  {nr:5,t:'Zinsschock',x:'Jede Gruppe zahlt für jeden Kredit 1 GC zusätzliche Zinsen.'},
+  {nr:6,t:'Deep Renovation Big-Wave',x:'Alle Redevelopments kosten 3 GC weniger.'},
+  {nr:7,t:'Baukostenexplosion',x:'Alle Baupreise verdoppeln sich diese Runde.'},
+  {nr:8,t:'Brown Discount',x:'Gebäude mit Gasheizung oder Energie >170 kWh/m²: −4 GC Verkaufswert (3 Runden).'},
+  {nr:9,t:'Green Premium',x:'Gebäude mit Wärmepumpe/Fernwärme & Energie <120 kWh/m²: +5 GC Verkaufswert (3 Runden).'},
+  {nr:10,t:'Bürokratiewut',x:'Jede Gruppe zahlt 1 GC Verwaltungsaufwand.'},
+  {nr:11,t:'Omnibus-Regelung',x:'Alle erhalten +2 GC. Je Gruppe wird 1 CO₂ zusätzlich abgezogen.'},
+  {nr:12,t:'Compliance-Skandal',x:'Gruppen mit <2 Reputation verlieren 1 GC.'},
+  {nr:13,t:'Gas-Mangellage',x:'Alle Gebäude mit Gasheizung: keine Mieteinnahmen.'},
+  {nr:14,t:'Erneuerbare im Aufwind',x:'Gebäude mit Wärmepumpe/PV: können 1 CO₂ ausgleichen.'},
+  {nr:15,t:'Biodiversitätspflicht',x:'Ohne Capex „Biodiversität" oder ESG „Leitfaden": kein Bauen diese Runde.'},
+  {nr:16,t:'Bauturbo (Deregulierung)',x:'Capex & Redev. 1 GC günstiger, aber +2 CO₂ zusätzlich.'},
+  {nr:17,t:'KI beschleunigt ESG',x:'Jede Gruppe darf 3 Capex ziehen und eine umsetzen.'},
+  {nr:18,t:'Sanierungszwang',x:'Energie >170 kWh/m²: 3 Runden keine Miete, keine Kredite.'},
+  {nr:19,t:'EU-Taxonomie Update',x:'Ohne ESG-Strategie: −1 GC. Mit >1 ESG-Strategie: +1 Reputation.'},
+  {nr:20,t:'Grüne Zinssenkung',x:'Gruppen mit Krediten: 3 Runden keine Zinsen.'},
+  {nr:21,t:'Förderung Deluxe',x:'Jede Capex 1 GC günstiger.'},
+  {nr:22,t:'Insolvenzwelle',x:'<10 GC: keine Mieteinnahmen.'},
+  {nr:23,t:'PV-Zwang & Gründachpflicht',x:'Neubau +2 GC, aber −5 CO₂ (3 Runden).'},
+  {nr:24,t:'Fridays for Future 4.0',x:'<2 Reputation: −1 GC. >3 Reputation: +2 GC Spenden.'},
+  {nr:25,t:'Politik-Madhouse',x:'Alle Aktionen mit Kosten: +1 GC teurer.'},
+  {nr:26,t:'Billiges Geld',x:'Alle Baumaßnahmen 1 GC günstiger, keine Zinsen diese Runde.'},
+  {nr:27,t:'Verkäufermarkt',x:'Jedes Gebäude: +5 GC Verkaufspreis.'},
+  {nr:28,t:'Gentrifizierung',x:'Redevelopments: +2 GC Bonus, aber −1 Reputation je Verkauf.'},
+  {nr:29,t:'Homeoffice-Pflicht',x:'Jedes 3. Bürogebäude: keine Miete.'},
+  {nr:30,t:'Biodiversitätssteuer',x:'Ohne Biodiversitäts-Maßnahme: keine Mieteinnahmen.'},
+  {nr:31,t:'Rezession',x:'Mieteinnahmen halbiert (aufgerundet).'},
+  {nr:32,t:'Bankenkrise I',x:'Keine neuen Kredite. Laufende Kredite +1 GC Zinsen.'},
+  {nr:33,t:'CRREM-Verschärfung',x:'Energie >150 kWh/m²: Kredite sofort zurückzahlen.'},
+  {nr:34,t:'Digitalpakt KI',x:'Capex mit Energiereduktion 1 GC günstiger.'},
+  {nr:35,t:'Geopolitische Krisen',x:'Alle Baumaßnahmen +2 GC teurer.'},
+  {nr:36,t:'Greenwashing-Skandal',x:'−1 Reputation je Bestandsgebäude ohne Maßnahme.'},
+  {nr:37,t:'Gasheizungsverbot',x:'Gasheizungen umstellen oder 2 GC Strafe.'},
+  {nr:38,t:'Worst First!',x:'Energie >170 kWh/m²: Capex umsetzen oder 2 GC Strafe.'},
+  {nr:39,t:'Lokale Klimaunruhen',x:'Alle Baumaßnahmen dauern 1 Runde länger.'},
+  {nr:40,t:'Innovationsoffensive',x:'Jede Gruppe darf eine Capex heraussuchen und umsetzen.'},
+  {nr:41,t:'ESG-Auszeichnung',x:'≥2 ESG-Strategien: +2 Reputation.'},
+  {nr:42,t:'Bankenkrise II',x:'Keine neuen Kredite. >3 Kredite: einen zurückzahlen.'},
+  {nr:43,t:'Wärmepumpen-Boom',x:'Gebäude ohne fossile Heizung: +1 GC Miete.'},
+  {nr:44,t:'Fachkräfte-Zuzug',x:'Bauzeit −1 Runde. Alle Baumaßnahmen 1 GC günstiger.'},
+  {nr:45,t:'Zinsbonus für ESG',x:'≥1 ESG-Strategie: keine Kreditzinsen.'},
+  {nr:46,t:'Material-Innovationen',x:'Redevelopments & Neubauten: −2 CO₂ (3 Runden).'},
+  {nr:47,t:'Solar-Offensive',x:'Gebäude mit Capex „Elektrifizierung", Redev. oder Neubau: +1 GC Miete.'},
+  {nr:48,t:'Green Deal Boost',x:'Jede Gruppe +3 GC für ESG-Maßnahmen.'},
+  {nr:49,t:'CO₂-Preis gesenkt',x:'Maßnahmen mit CO₂-Abzügen 1 GC günstiger.'},
+  {nr:50,t:'Digitalisierungsschub',x:'Bauzeit aller Redev./Neubauten −1 Runde.'},
+  {nr:51,t:'Entbürokratisierung',x:'Alle Gebäude +1 GC Mieteinnahmen.'},
+  {nr:52,t:'Immobilienboom in Nischen',x:'Redevelopments: +2 GC Bonus. Neubauten: −3 GC Verkaufspreis.'},
+  {nr:53,t:'ETS III: CO₂-Goldstandard',x:'Für 1 GC können 2 CO₂ ausgeglichen werden (3 Runden).'},
+  {nr:54,t:'Baukosten festgesetzt',x:'Diese Runde −1 GC. Nächste Runde +1 GC.'},
+  {nr:55,t:'Gewerbeflächen-Trend',x:'Büro/Gewerbe: +1 GC Mieteinnahmen.'},
+  {nr:56,t:'ESG-Kartelle',x:'Gruppen können eine ESG-Karte kostenfrei ziehen, −1 Reputation.'},
+  {nr:57,t:'Marktbereinigung',x:'Jede Gruppe kann ein Gebäude 5 GC günstiger kaufen.'},
+  {nr:58,t:'Lokale Initiativen',x:'CO₂ aus Gebäudebetrieb für 2 GC ignorierbar.'},
+  {nr:59,t:'Energiepreis-Schock',x:'Jede Gruppe zahlt 1 GC je vermietetes Gebäude.'},
+  {nr:60,t:'Politische Unsicherheit',x:'Alle Gebäudeverkäufe: −2 GC.'}
+];
+const KLIMA_G=[
+  {t:'Stürme & Tornados',x:'Extremwinde. Würfele Region (W6). Gebäude dort: +2 SP.'},
+  {t:'Hitzewelle & Dürre',x:'Hitze lähmt Regionen. Würfele Region. Ohne Passive Kühlung: +1 SP.'},
+  {t:'Hungersnöte & Migration',x:'Versorgung zerbricht. Alle Gruppen −2 GC.'},
+  {t:'Flächenwaldbrände',x:'Wälder brennen. Würfele Region. Gebäude dort: +3 SP.'},
+  {t:'Extremtemperaturen',x:'Hitze & Frost. Ohne Klimaresilienz: +1 SP alle Gebäude.'},
+  {t:'Starkregen & Überschwemmung',x:'Sturzfluten. Würfele Region. +2 SP, keine Miete nächste Runde.'},
+  {t:'Lokale Konflikte',x:'Wirtschaft stockt. Alle −1 GC.'},
+  {t:'CO₂-Bepreisung ausgesetzt',x:'CO₂-Ausgleich kostet 0 GC diese Runde.'},
+  {t:'Urban Heat Islands',x:'Ohne Grünfläche: keine Miete.'},
+  {t:'Zoonosen-Pandemie',x:'Alle −2 GC.'},
+  {t:'Massenproteste',x:'Fossile Gebäude: −1 GC, −1 Reputation.'},
+  {t:'Verunsicherung Investoren',x:'Keine Transaktionen diese Runde.'}
+];
+const KLIMA_O=[
+  {t:'Kontinentale Dürre',x:'Alle −3 GC. Ohne Klimaresilienz: +2 SP.'},
+  {t:'Überschwemmungen XXL',x:'Würfele 2 Regionen. +3 SP, keine Miete 2 Runden.'},
+  {t:'Globale Hungersnot',x:'Je Gruppe −4 CO₂ vom gemeinsamen Budget.'},
+  {t:'Extremhagel & Dauerregen',x:'Alle Gebäude +2 SP. Reparaturen kosten doppelt.'},
+  {t:'Kontinentale Waldbrände',x:'Würfele Region. Betroffene Gebäude +4 SP.'},
+  {t:'Extremzyklone',x:'Ohne Capex „Sturmfest": +3 SP alle Gebäude.'},
+  {t:'Globale Super-Pandemie',x:'Keine Mieteinnahmen 2 Runden.'},
+  {t:'Klimamigration',x:'Küstenregionen (1,2): dauerhaft −10 GC Verkaufswert.'},
+  {t:'Infrastruktur-Kollaps',x:'Baumaßnahmen +1 Runde. Alle −3 GC.'},
+  {t:'Blackout durch Hitze',x:'Klimatisierte Gebäude: keine Miete.'},
+  {t:'Wasserkonflikte',x:'Alle −3 GC, −1 Reputation.'},
+  {t:'Mikroplastikorganismen',x:'Ohne Sanierung: +2 SP alle Gebäude.'}
+];
+const KLIMA_R=[
+  {t:'Kollaps der Biodiversität',x:'Alle Capex +3 GC. Alle Gruppen −5 GC.'},
+  {t:'Jahreszeiten-Chaos',x:'Alle Gebäude erhalten jede Runde 1 SP.'},
+  {t:'Methanausgasung Arktis',x:'Kipppunkt! Je Gruppe −4 CO₂ vom Budget.'},
+  {t:'Globale Lieferketten brechen',x:'Bauzeiten +2 Runden. +5 GC je Maßnahme.'},
+  {t:'Energieinfrastruktur zerstört',x:'Keine Mieteinnahmen 2 Runden.'},
+  {t:'Kipp-Punkt Meeresbiologie',x:'Ab sofort +2 CO₂ dauerhaft je Runde je Gruppe.'},
+  {t:'Globale Ressourcenkriege',x:'Alle −6 GC. Küstengebäude +5 SP.'},
+  {t:'Wasserkreislauf gestört',x:'Alle Gebäude +3 SP. Keine Reparaturen diese Runde.'},
+  {t:'Globales Hochwasser',x:'Alle Gebäude +2 SP. Alle −3 GC.'},
+  {t:'Polare Eisschmelze',x:'Küstenregionen (1,2): dauerhaft −10 GC Verkaufswert.'},
+  {t:'Flächenhafte Unbewohnbarkeit',x:'Würfele Region — alle dortigen Gebäude werden wertlos.'},
+  {t:'Klimakollaps Finanzsystem',x:'Alle Gebäude −5 GC dauerhaft. Keine Kredite mehr.'}
+];
+const BUILDINGS=[
+  {nr:1,name:'Behörde für WVI',addr:'Alter Steinweg 4, Hamburg',year:1962,area:31961,energy:113.3,heat:'Fernwärme',co2:15.6,feat:'Büro, Denkmal, Low-Tech',reg:1},
+  {nr:2,name:'Justizbehörde',addr:'Drehbahn 36, Hamburg',year:1915,area:25666,energy:80.3,heat:'Fernwärme',co2:11.4,feat:'Büro, Denkmal, Low-Tech',reg:1},
+  {nr:3,name:'Finanzamt Hamburg-Hansa',addr:'Steinstraße 10, Hamburg',year:1926,area:26831,energy:85.8,heat:'Fernwärme',co2:16.9,feat:'Büro, Denkmal, Low-Tech',reg:1},
+  {nr:4,name:'Ortsamt Altona',addr:'Alte Königstr. 29-39, HH',year:1992,area:4278,energy:116.4,heat:'Erdgas',co2:29.0,feat:'Büro, Low-Tech',reg:1},
+  {nr:5,name:'Brick and Brain 28',addr:'Amsinckstr. 28, Hamburg',year:1991,area:8692,energy:151.9,heat:'Fernwärme',co2:29.6,feat:'Büro',reg:1},
+  {nr:6,name:'Rathaus Stellingen',addr:'Basselweg 73, Hamburg',year:1912,area:2712,energy:143.8,heat:'Erdgas',co2:32.9,feat:'Büro, Denkmal, Low-Tech',reg:1},
+  {nr:7,name:'Geesthof',addr:'Besenbinderhof 41, HH',year:1927,area:5448,energy:137.9,heat:'Fernwärme',co2:25.2,feat:'Büro, Denkmal',reg:1},
+  {nr:8,name:'Amtsgericht Harburg',addr:'Buxtehuder Str. 9-11, HH',year:1868,area:7747,energy:89.3,heat:'Erdgas',co2:22.7,feat:'Büro, Denkmal, Low-Tech',reg:1},
+  {nr:9,name:'Bieberhaus',addr:'Ernst-Merck-Str. 9, HH',year:1909,area:17535,energy:105.8,heat:'Fernwärme',co2:25.3,feat:'Büro, Denkmal',reg:1},
+  {nr:10,name:'Ortsamt Lokstedt',addr:'Garstedter Weg 13, HH',year:1964,area:3579,energy:76.0,heat:'Erdgas',co2:20.2,feat:'Büro, Low-Tech',reg:1},
+  {nr:11,name:'Bezirksamt Eimsbüttel',addr:'Grindelberg 62-66, HH',year:1953,area:18372,energy:102.6,heat:'Fernwärme',co2:16.0,feat:'Büro, Hochhaus, Denkmal',reg:1},
+  {nr:12,name:'FH öffentliche Verwaltung',addr:'Hammer Steindamm 129, HH',year:1929,area:7160,energy:104.0,heat:'Erdgas',co2:24.6,feat:'Büro, Denkmal, Low-Tech',reg:1},
+  {nr:13,name:'Holstenhof',addr:'Steinstr. 5-7, Hamburg',year:1901,area:22308,energy:100.2,heat:'Fernwärme',co2:24.2,feat:'Büro, Denkmal',reg:1},
+  {nr:14,name:'Amtsgericht Altona',addr:'Elbgaustr. 274, Hamburg',year:1874,area:5750,energy:106.4,heat:'Fernwärme',co2:12.7,feat:'Büro, Denkmal',reg:1},
+  {nr:15,name:'Nagelsweg',addr:'Nagelsweg 41-43, Hamburg',year:1987,area:16200,energy:173.2,heat:'Fernwärme',co2:20.8,feat:'Büro',reg:1},
+  {nr:16,name:'Bartholomayhaus',addr:'Steinstr. 5-7, Hamburg',year:1939,area:22308,energy:100.2,heat:'Fernwärme',co2:24.2,feat:'Büro, Denkmal',reg:1},
+  {nr:17,name:'Staatsarchiv Wandsbek',addr:'Schloßstr. 60, Hamburg',year:1997,area:2987,energy:60.9,heat:'Fernwärme',co2:7.3,feat:'Büro',reg:1},
+  {nr:18,name:'Kundenzentrum Billstedt',addr:'Möllner Landstr. 3, HH',year:1950,area:5960,energy:133.7,heat:'Erdgas',co2:32.7,feat:'Büro',reg:1},
+  {nr:19,name:'Kundenzentrum Rahlstedt',addr:'Rahlstedter Str. 151, HH',year:1983,area:3800,energy:108.0,heat:'Erdgas',co2:26.2,feat:'Büro',reg:1},
+  {nr:20,name:'Friedrichstraße 16',addr:'Friedrichstr. 16, Düsseldorf',year:1998,area:9603,energy:104.6,heat:'Erdgas',co2:25.5,feat:'Büro',reg:2},
+  {nr:21,name:'Sternhöhe',addr:'Reisholzer Str. 2-4, DÜS',year:1987,area:11100,energy:140.1,heat:'Erdgas',co2:34.2,feat:'Büro, Business-Park',reg:2},
+  {nr:22,name:'Altes Fundamt',addr:'Bastionstr. 37, Düsseldorf',year:1885,area:4800,energy:126.2,heat:'Fernwärme',co2:15.1,feat:'Büro',reg:2},
+  {nr:23,name:'Carl Rise',addr:'Carl-Schurz-Str. 2, Neuss',year:1959,area:34000,energy:237.7,heat:'Fernwärme',co2:28.5,feat:'Büro, Hochhaus, Klimatisiert',reg:2},
+  {nr:24,name:'Quedlinburger Str.',addr:'Quedlinburger Str. 25, DÜS',year:1992,area:11800,energy:121.0,heat:'Fernwärme',co2:14.5,feat:'Büro',reg:2},
+  {nr:25,name:'Immermanntower',addr:'Immermannstr. 40, DÜS',year:1956,area:9895,energy:97.2,heat:'Fernwärme',co2:11.7,feat:'Büro, Hochhaus',reg:2},
+  {nr:26,name:'Elisabethstraße',addr:'Elisabethstr. 58, Düsseldorf',year:1931,area:5630,energy:198.2,heat:'Wärmepumpe',co2:39.5,feat:'Büro',reg:2},
+  {nr:27,name:'Forum Oberkassel',addr:'Luegallee 87-93, DÜS',year:1999,area:9700,energy:127.0,heat:'Erdgas',co2:30.8,feat:'Büro',reg:2},
+  {nr:28,name:'S30',addr:'Steinstr. 30, Düsseldorf',year:1971,area:30000,energy:245.2,heat:'Erdgas',co2:59.6,feat:'Büro, Hochhaus',reg:2},
+  {nr:29,name:'Horbeller Straße',addr:'Horbeller Str. 11, Köln',year:1991,area:10690,energy:101.1,heat:'Erdgas',co2:24.5,feat:'Büro',reg:3},
+  {nr:30,name:'Rheinoffice',addr:'Maarweg 165, Köln',year:1977,area:17200,energy:141.4,heat:'Fernwärme',co2:16.9,feat:'Büro',reg:3},
+  {nr:31,name:'Hans-Böckler-Str.',addr:'Hans-Böckler-Str. 2, Köln',year:1991,area:12800,energy:162.7,heat:'Fernwärme',co2:19.5,feat:'Büro',reg:3},
+  {nr:32,name:'City-Tor',addr:'Innere Kanalstr. 69, Köln',year:1988,area:17200,energy:114.7,heat:'Fernwärme',co2:13.8,feat:'Büro',reg:3},
+  {nr:33,name:'DTA 7',addr:'Richard-Byrd-Str. 7, Köln',year:2005,area:11200,energy:169.9,heat:'Fernwärme',co2:20.4,feat:'Büro, Klimatisiert',reg:3},
+  {nr:34,name:'Goldsteinstraße',addr:'Goldsteinstr. 232, Frankfurt',year:1996,area:21760,energy:115.3,heat:'Fernwärme',co2:13.8,feat:'Büro',reg:4},
+  {nr:35,name:'GNS 3',addr:'Gustav-Nachtigal-Str. 3, WI',year:1984,area:11900,energy:188.4,heat:'Erdgas',co2:45.8,feat:'Büro, Klimatisiert',reg:4},
+  {nr:36,name:'Kastor',addr:'Platz der Einheit 1, FFM',year:1997,area:30389,energy:164.7,heat:'Fernwärme',co2:19.8,feat:'Büro, Hochhaus, Klimatisiert',reg:4},
+  {nr:37,name:'TaunusQuartier',addr:'Taunusstr. 1, Frankfurt',year:1902,area:21500,energy:98.8,heat:'Fernwärme',co2:11.8,feat:'Büro, Denkmal',reg:4},
+  {nr:38,name:'Hanns-Klemm-Str.',addr:'Hanns-Klemm-Str. 8, BöBl',year:2001,area:18500,energy:209.7,heat:'Fernwärme',co2:25.2,feat:'Büro',reg:5},
+  {nr:39,name:'Breitwiesenstraße',addr:'Breitwiesenstr. 2, Stuttgart',year:1972,area:14800,energy:148.9,heat:'Erdgas',co2:36.1,feat:'Büro',reg:5},
+  {nr:40,name:'Karlstraße',addr:'Karlstr. 60, München',year:1961,area:12700,energy:122.7,heat:'Fernwärme',co2:14.7,feat:'Büro',reg:6},
+  {nr:41,name:'Reinhardtstraße',addr:'Reinhardtstr. 34, Berlin',year:1956,area:14300,energy:216.8,heat:'Erdgas',co2:52.6,feat:'Büro',reg:2},
+  {nr:42,name:'Technologiezentrum Borsig',addr:'Borsigstr. 40, Berlin',year:1998,area:18200,energy:111.8,heat:'Fernwärme',co2:13.4,feat:'Büro, Denkmal',reg:2},
+  {nr:43,name:'Gasstraße',addr:'Gasstr. 4-6, Hamburg',year:1900,area:15600,energy:112.8,heat:'Fernwärme',co2:13.5,feat:'Büro',reg:1},
+  {nr:44,name:'Carl Living',addr:'Holsteinischer Kamp 20, HH',year:2022,area:14600,energy:58.3,heat:'Fernwärme',co2:7.0,feat:'Büro, Neubau',reg:1},
+  {nr:45,name:'Maarweg-Center',addr:'Maarweg 165, Köln',year:1993,area:19700,energy:161.6,heat:'Fernwärme',co2:19.4,feat:'Büro',reg:3},
+  {nr:46,name:'Pollux-Haus',addr:'Platz der Einheit 2, FFM',year:2000,area:24800,energy:132.9,heat:'Fernwärme',co2:15.9,feat:'Büro',reg:4},
+  {nr:47,name:'Emporia',addr:'Hauptstr. 10, Karlsruhe',year:1966,area:7500,energy:97.7,heat:'Erdgas',co2:23.7,feat:'Büro',reg:5},
+  {nr:48,name:'Eichwiesenring',addr:'Eichwiesenring 3, Stuttgart',year:1993,area:11900,energy:78.2,heat:'Erdgas',co2:19.0,feat:'Mischnutzung',reg:5},
+  {nr:49,name:'Solmsstraße',addr:'Solmsstr. 4, Frankfurt',year:2001,area:6060,energy:124.5,heat:'Fernwärme',co2:14.9,feat:'Büro, Klimatisiert',reg:4},
+  {nr:50,name:'An den Dominikanern',addr:'An den Dominikanern 11, KÖL',year:2000,area:6230,energy:184.5,heat:'Fernwärme',co2:22.1,feat:'Büro',reg:3},
+];
+const GRP_COLORS=['#4ade80','#60a5fa','#f97316','#a78bfa','#fbbf24','#f472b6','#34d399','#fb923c','#818cf8','#e879f9'];
+
+// ── STATE ──
+let S = {
+  round:1, year:2025, tempSlider:13, co2Budget:210, co2PerGroup:70,
+  maxRounds:'?', phase:1, currentCard:null,
+  groups:[], market:[], salesLog:[],
+  newstickerDeck: shuffle([...NEWSTICKER]),
+  klimaGDeck: shuffle([...KLIMA_G]),
+  klimaODeck: shuffle([...KLIMA_O]),
+  klimaRDeck: shuffle([...KLIMA_R]),
+  settings: defaultSettings(),
+  toggles:{klima:'alle',startmode:'random'},
+  phaseTimes:[0,0,5,5,3,2],
+  startBldgCount: 3,
+};
+let myGroupId = null;   // set when in group view
+let timerInterval = null;
+let timerSeconds = 0;
+let _marketPool = [];
+let _salesLogArr = [];
+const IS_GROUP = new URLSearchParams(location.search).has('group');
+
+function defaultSettings(){
+  return {
+    buy:20,sell_base:15,trans_bonus:8,rent:1,rent_zk:1,capex:3,redev:10,neubau:20,
+    esg_rev:1,esg_impl:2,marketing:1,
+    p_capex_gc:3,p_capex_co2:1,p_redev_gc:10,p_redev_co2:7,p_redev_rnd:1,
+    p_neubau_gc:20,p_neubau_co2:36,p_neubau_rnd:2,p_repair_gc:1,p_repair_co2:1,
+    p_betrieb_co2:1,p_fossil_co2:1,
+    p_s_base:15,p_s_capex:3,p_s_redev:10,p_s_neubau:20,p_trans:8,
+    p_kr_redev:8,p_kr_neubau:16,p_t1:170,p_t2:130,p_t3:100
+  };
+}
+
+// ── FIREBASE HELPERS ──
+function fbSet(path, val){ return set(ref(db,path), val); }
+function fbGet(path){ return get(ref(db,path)).then(s=>s.val()); }
+function fbUpdate(path, val){ return update(ref(db,path), val); }
+function fbListen(path, cb){ onValue(ref(db,path), snap=>cb(snap.val())); }
+
+// ── INIT ──
+async function init(){
+  try {
+    const existing = await fbGet('game/state');
+    if(IS_GROUP){
+      if(!existing){ show('connect'); document.getElementById('connect-msg').textContent='Kein laufendes Spiel gefunden. Bitte Spielleiter kontaktieren.'; return; }
+      S = {...S,...existing};
+      show('join');
+      renderJoinScreen();
+      listenAsGroup();
+    } else {
+      if(existing && existing.groups && existing.groups.length>0){
+        S = {...S,...existing};
+        show('dashboard');
+        initDashboard();
+        listenAsSL();
+      } else {
+        show('onboarding');
+        initOnboarding();
+      }
+      // Show join URL hint
+      const url = location.href.split('?')[0]+'?group=1';
+      const el = document.getElementById('join-url-display');
+      if(el) el.textContent = '👥 Gruppen-URL: '+url.replace('https://','');
+    }
+  } catch(e){
+    console.error(e);
+    document.getElementById('connect-msg').textContent = 'Verbindungsfehler: '+e.message;
+  }
+}
+
+// ── SHOW SCREEN ──
+function show(name){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-'+name).classList.add('active');
+}
+
+// ═══════════════════════════════════
+// ONBOARDING
+// ═══════════════════════════════════
+let onbGroups=[];
+
+function initOnboarding(){
+  try { const p=localStorage.getItem('ig_settings'); if(p) S.settings=JSON.parse(p); } catch(e){}
+  renderOnbGroups();
+  document.getElementById('p_start_bldg').addEventListener('input',e=>{
+    document.getElementById('start-bldg-preview').textContent=e.target.value;
+  });
+}
+
+function onbAdd(){
+  const n=document.getElementById('onb-gname').value.trim(); if(!n) return;
+  const gc=parseInt(document.getElementById('onb-ggc').value)||10;
+  const p=document.getElementById('onb-gprofile').value;
+  const col=GRP_COLORS[onbGroups.length%GRP_COLORS.length];
+  onbGroups.push({id:'g'+Date.now(),name:n,gc,profile:p,color:col,reputation:0,buildings:[],esg:[],credits:0,totalCO2:0,ready:false});
+  document.getElementById('onb-gname').value='';
+  document.getElementById('onb-gprofile').value='';
+  renderOnbGroups();
+}
+document.getElementById('onb-gname').addEventListener('keydown',e=>{if(e.key==='Enter')onbAdd();});
+
+function renderOnbGroups(){
+  const el=document.getElementById('onb-groups');
+  el.innerHTML=onbGroups.map(g=>`
+    <div class="group-row">
+      <div class="cdot" style="background:${g.color}"></div>
+      <div class="gn">${g.name}</div>
+      <div class="ggc">${g.gc} GC</div>
+      <div class="gp">${g.profile||''}</div>
+      <button class="rm" onclick="rmOnbGroup('${g.id}')">×</button>
+    </div>`).join('');
+  const btn=document.getElementById('launch-btn');
+  btn.disabled=onbGroups.length<1;
+  // summary
+  document.getElementById('s-grp').textContent=onbGroups.length;
+  const pg=parseInt(document.getElementById('onb-co2pg').value)||70;
+  document.getElementById('s-co2').textContent=onbGroups.length*pg;
+  const t=parseInt(document.getElementById('onb-temp').value)||13;
+  document.getElementById('s-temp').textContent='+'+( t/10).toFixed(1)+'°C';
+  document.getElementById('s-gc').textContent=onbGroups.reduce((a,g)=>a+g.gc,0)+' GC';
+  const total=onbGroups.length*pg;
+  document.getElementById('launch-info').innerHTML=onbGroups.length<1?'Noch keine Gruppen.':
+    `<strong>${onbGroups.length} Gruppen</strong> · CO₂-Budget <strong>${total}</strong> (${onbGroups.length}×${pg}) · Max. Runden: <strong>${document.getElementById('onb-maxrnd').value}</strong>`;
+}
+['onb-co2pg','onb-temp','onb-year','onb-maxrnd'].forEach(id=>{
+  document.getElementById(id)?.addEventListener('input',renderOnbGroups);
+});
+
+function rmOnbGroup(id){ onbGroups=onbGroups.filter(g=>g.id!==id); renderOnbGroups(); }
+
+function topt(el,grp){
+  el.closest('.toggle-group').querySelectorAll('.topt').forEach(o=>o.classList.remove('active'));
+  el.classList.add('active');
+  S.toggles[grp]=el.dataset.v;
+}
+
+function switchStab(n,el){
+  document.querySelectorAll('.stab').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.scontent').forEach(s=>s.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('s-'+n).classList.add('active');
+}
+
+function saveSettings(){
+  const ids=['buy','sell_base','trans_bonus','rent','rent_zk','capex','redev','neubau','esg_rev','esg_impl','marketing',
+    'p_capex_gc','p_capex_co2','p_redev_gc','p_redev_co2','p_redev_rnd','p_neubau_gc','p_neubau_co2','p_neubau_rnd',
+    'p_repair_gc','p_repair_co2','p_betrieb_co2','p_fossil_co2','p_s_base','p_s_capex','p_s_redev','p_s_neubau',
+    'p_trans','p_kr_redev','p_kr_neubau','p_t1','p_t2','p_t3'];
+  ids.forEach(k=>{const e=document.getElementById('c_'+k)||document.getElementById('p_'+k);if(e)S.settings[k]=parseFloat(e.value)||0;});
+  S.startBldgCount=parseInt(document.getElementById('p_start_bldg').value)||3;
+  S.phaseTimes=[0,
+    parseInt(document.getElementById('pt_1').value)||0,
+    parseInt(document.getElementById('pt_2').value)||0,
+    parseInt(document.getElementById('pt_3').value)||5,
+    parseInt(document.getElementById('pt_4').value)||5,
+    parseInt(document.getElementById('pt_5').value)||3,
+    parseInt(document.getElementById('pt_6').value)||2
+  ];
+  try{localStorage.setItem('ig_settings',JSON.stringify(S.settings));}catch(e){}
+  const ok=document.getElementById('save-ok');
+  ok.classList.add('show'); setTimeout(()=>ok.classList.remove('show'),2000);
+}
+function resetSettings(){ S.settings=defaultSettings(); }
+function loadPreset(){
+  try{const p=localStorage.getItem('ig_settings');if(p){S.settings=JSON.parse(p);alert('Preset geladen.');}}catch(e){alert('Kein Preset.');}
+}
+
+async function launchGame(){
+  if(!onbGroups.length) return;
+  saveSettings();
+  const y=parseInt(document.getElementById('onb-year').value)||2025;
+  const t=parseInt(document.getElementById('onb-temp').value)||13;
+  const pg=parseInt(document.getElementById('onb-co2pg').value)||70;
+  const mr=document.getElementById('onb-maxrnd').value;
+  const startN=S.startBldgCount;
+  const mode=S.toggles.startmode;
+
+  // Assign start buildings
+  const deck=shuffle([...BUILDINGS]);
+  const groups=onbGroups.map(g=>({...g,buildings:[],totalCO2:0,ready:false}));
+  if(mode==='random'){
+    let dealt=0;
+    groups.forEach(g=>{g.buildings=deck.slice(dealt,dealt+startN);dealt+=startN;});
+    _marketPool=shuffle(deck.slice(groups.length*startN));
+  } else {
+    _marketPool=shuffle([...BUILDINGS]);
+  }
+
+  S={...S, round:1, year:y, tempSlider:t, co2Budget:pg*groups.length, co2PerGroup:pg,
+    maxRounds:mr, phase:1, groups, market:[], salesLog:[],
+    newstickerDeck:shuffle([...NEWSTICKER]),
+    klimaGDeck:shuffle([...KLIMA_G]), klimaODeck:shuffle([...KLIMA_O]), klimaRDeck:shuffle([...KLIMA_R]),
+    currentCard:null };
+
+  // Build initial market
+  S.market=buildMarket();
+
+  await fbSet('game/state', S);
+  show('dashboard');
+  initDashboard();
+  listenAsSL();
+}
+
+// ═══════════════════════════════════
+// DASHBOARD (Spielleiter)
+// ═══════════════════════════════════
+function initDashboard(){
+  renderTicker();
+  renderThermo();
+  renderEffects();
+  renderPhaseBar();
+  renderReadyBar();
+  renderGroups();
+  renderMarket();
+  renderBuildings();
+  updateCO2Forms();
+  updateKlimaBtn();
+  const url=location.href.split('?')[0]+'?group=1';
+  const el=document.getElementById('join-url-display');
+  if(el) el.innerHTML=`<span style="background:var(--surface2);padding:4px 8px;border-radius:4px;border:1px solid var(--border)">👥 ${url.replace(/.*\/\//,'')}</span>`;
+  logSys(`Spiel gestartet · ${S.groups.length} Gruppen · ${S.year} · CO₂-Budget ${S.co2Budget}`);
+  S.groups.forEach(g=>{
+    logSys(`${g.name}: ${g.buildings.map(b=>'#'+b.nr+' '+b.name).join(', ')||'keine Startgebäude'}`);
+  });
+}
+
+function listenAsSL(){
+  fbListen('game/state', state=>{
+    if(!state) return;
+    const prevPhase=S.phase;
+    S={...S,...state};
+    renderTicker();
+    renderThermo();
+    renderEffects();
+    renderPhaseBar();
+    renderReadyBar();
+    renderGroups();
+    renderMarket();
+    updateCO2Forms();
+    updateKlimaBtn();
+    if(state.currentCard) renderCurrentCard(state.currentCard);
+  });
+}
+
+// TICKER
+function renderTicker(){
+  document.getElementById('tk-rnd').textContent=S.round;
+  document.getElementById('tk-yr').textContent=S.year;
+  document.getElementById('tk-maxrnd').textContent=S.maxRounds;
+  document.getElementById('co2-rnd-lbl').textContent=S.round;
+  document.getElementById('mkt-rnd').textContent=S.round;
+  const row=getTRow(S.tempSlider);
+  const tc=getTCol(S.tempSlider);
+  const ts='+'+( S.tempSlider/10).toFixed(1)+'°C';
+  document.getElementById('tk-temp').textContent=ts;
+  document.getElementById('tk-temp').style.color=tc;
+  document.getElementById('tk-co2').textContent=S.co2Budget;
+  const pp=S.co2Budget/Math.max(1,S.groups.length);
+  document.getElementById('tk-co2').style.color=pp<10?'var(--red)':pp<30?'var(--orange)':'var(--green)';
+}
+
+// THERMOMETER
+function getTRow(t){ return TEMP_TABLE.find(r=>r.t===parseInt(t))||TEMP_TABLE[3]; }
+function getTCol(t){ t=parseInt(t); return t<=14?'var(--safe)':t<=17?'var(--warn)':t<=20?'var(--hot)':'var(--crit)'; }
+
+function renderThermo(){
+  const t=S.tempSlider, row=getTRow(t), pct=((t-10)/20)*100, col=getTCol(t);
+  const ts='+'+( t/10).toFixed(1)+'°C';
+  document.getElementById('d-fill').style.height=pct+'%';
+  document.getElementById('d-fill').style.background=col;
+  document.getElementById('d-temp').textContent=ts;
+  document.getElementById('d-temp').style.color=col;
+  document.getElementById('d-temp-sub').textContent=`Jahr ${row.year} · ${row.ppm}`;
+  document.getElementById('d-co2').textContent=S.co2Budget;
+  document.getElementById('d-co2-sub').textContent=`${S.groups.length}×${S.co2PerGroup} CO₂`;
+  // labels: +1°C bottom, +3°C top
+  const labEl=document.getElementById('d-labels');
+  labEl.innerHTML=[10,15,20,25,30].map(m=>{
+    const bp=((m-10)/20)*100;
+    return `<div class="tlabel ${Math.abs(m-t)<2?'cur':''}" style="bottom:${bp}%">
+      <div class="tdot" style="background:${getTCol(m)}"></div>+${(m/10).toFixed(1)}°C</div>`;
+  }).join('');
+}
+
+function renderEffects(){
+  document.getElementById('d-effects').innerHTML=EFFECTS.map(e=>`
+    <div class="erow ${S.tempSlider>=e.t?'active':''}">
+      <span class="etag">+${(e.t/10).toFixed(1)}°C</span><span>${e.txt}</span>
+    </div>`).join('');
+}
+
+function manualTemp(v){
+  S.tempSlider=parseInt(v);
+  renderThermo(); renderEffects(); updateKlimaBtn(); renderTicker();
+  fbUpdate('game/state',{tempSlider:S.tempSlider,co2Budget:S.co2Budget});
+}
+
+// PHASE
+function renderPhaseBar(){
+  document.querySelectorAll('.phase-step').forEach(el=>{
+    const p=parseInt(el.dataset.p);
+    el.classList.toggle('active',p===S.phase);
+    el.classList.toggle('done',p<S.phase);
+  });
+}
+
+async function setPhase(p){
+  S.phase=p;
+  // Reset all ready flags
+  S.groups.forEach(g=>g.ready=false);
+  renderPhaseBar();
+  renderReadyBar();
+  startPhaseTimer(p);
+  await fbSet('game/state',S);
+  logSys(`Phase ${p} gestartet: ${PHASES[p-1].lbl}`);
+}
+
+// READY BAR
+function renderReadyBar(){
+  const bar=document.getElementById('ready-bar');
+  const all=S.groups.length;
+  const done=S.groups.filter(g=>g.ready).length;
+  bar.innerHTML=`<span class="ready-lbl">Phase ${S.phase} · ${done}/${all} bereit:</span>`+
+    S.groups.map(g=>`
+      <div class="ready-chip ${g.ready?'done':'waiting'}">
+        <div class="rdot" style="background:${g.color}"></div>
+        ${g.name}
+      </div>`).join('');
+}
+
+// TIMER
+function startPhaseTimer(phase){
+  clearInterval(timerInterval);
+  const mins=S.phaseTimes?.[phase]||0;
+  const bar=document.getElementById('timer-bar');
+  if(!mins){ if(bar) bar.style.display='none'; return; }
+  timerSeconds=mins*60;
+  if(bar) bar.style.display='flex';
+  renderTimerDisplay();
+  timerInterval=setInterval(()=>{
+    timerSeconds--;
+    renderTimerDisplay();
+    if(timerSeconds<=0){ clearInterval(timerInterval); logSys(`Phase ${phase} Timer abgelaufen`); }
+  },1000);
+}
+function renderTimerDisplay(){
+  const m=Math.floor(timerSeconds/60),s=timerSeconds%60;
+  const el=document.getElementById('timer-display');
+  if(el) el.textContent=m+':'+(s<10?'0':'')+s;
+  if(el) el.style.color=timerSeconds<30?'var(--red)':timerSeconds<60?'var(--orange)':'var(--yellow)';
+}
+function toggleTimer(){
+  if(timerInterval){ clearInterval(timerInterval); timerInterval=null; }
+  else startPhaseTimer(S.phase);
+}
+
+// ROUND
+async function nextRound(){
+  S.round++; S.year++;
+  S.phase=1;
+  S.groups.forEach(g=>g.ready=false);
+  // Return unsold market to pool
+  S.market.filter(m=>!m.sold).forEach(m=>{
+    if(m.building) _marketPool.push(m.building);
+  });
+  S.market=buildMarket();
+  _salesLogArr=[];
+  renderSalesLog();
+  await fbSet('game/state',S);
+  renderTicker(); renderPhaseBar(); renderReadyBar(); renderMarket(); updateCO2Forms();
+  logSys(`─── Runde ${S.round} · Jahr ${S.year} ───`);
+  ['qc_bet','qc_fos','qc_cap','qc_red','qc_neu','qc_off'].forEach(id=>{const e=document.getElementById(id);if(e)e.value=0;});
+  qTotal();
+}
+async function prevRound(){
+  if(S.round<=1) return;
+  S.round--; S.year--;
+  await fbUpdate('game/state',{round:S.round,year:S.year});
+  renderTicker();
+}
+
+// CARDS
+function updateKlimaBtn(){ const b=document.getElementById('klima-btn'); if(b) b.style.display=S.tempSlider>=15?'':'none'; }
+
+async function drawCard(type){
+  let card,cssType,badge;
+  if(type==='news'){
+    if(!S.newstickerDeck.length){ S.newstickerDeck=shuffle([...NEWSTICKER]); logSys('Newsticker neu gemischt.'); }
+    const c=S.newstickerDeck.pop();
+    card={t:c.t,x:c.x}; cssType='news'; badge=`Newsticker #${c.nr} · Runde ${S.round}`;
+  } else {
+    const t=S.tempSlider;
+    let deck,lbl,css;
+    if(t>=26){deck=S.klimaRDeck;lbl='Klimakarte 🔴 rot';css='rot';}
+    else if(t>=21){deck=S.klimaODeck;lbl='Klimakarte 🟠 orange';css='orange';}
+    else{deck=S.klimaGDeck;lbl='Klimakarte 🟡 gelb';css='gelb';}
+    if(!deck.length){ const fresh=t>=26?KLIMA_R:t>=21?KLIMA_O:KLIMA_G; if(t>=26)S.klimaRDeck=shuffle([...KLIMA_R]);else if(t>=21)S.klimaODeck=shuffle([...KLIMA_O]);else S.klimaGDeck=shuffle([...KLIMA_G]); deck=t>=26?S.klimaRDeck:t>=21?S.klimaODeck:S.klimaGDeck; }
+    const c=deck.pop();
+    card={t:c.t,x:c.x}; cssType=css; badge=`${lbl} · Runde ${S.round}`;
+  }
+  S.currentCard={...card,css:cssType,badge};
+  renderCurrentCard(S.currentCard);
+  addHist({rnd:S.round,badge:badge.split('·')[0].trim(),title:card.t,css:cssType});
+  await fbSet('game/state',S);
+  logEvent(type==='news'?'news':'klima',card.t);
+}
+
+function renderCurrentCard(card){
+  if(!card) return;
+  document.getElementById('d-cur-card').innerHTML=`
+    <div class="active-card ${card.css}">
+      <div class="card-badge">${card.badge}</div>
+      <div class="card-title">${card.t}</div>
+      <div class="card-body">${card.x}</div>
+    </div>`;
+}
+
+let _hist=[];
+function addHist(h){ _hist.unshift(h); renderHist(); }
+function renderHist(){
+  const el=document.getElementById('d-hist');
+  if(!el) return;
+  el.innerHTML=_hist.slice(0,10).map(h=>`
+    <div class="hist-row">
+      <span class="hist-rnd">Rd.${h.rnd}</span>
+      <span class="hbadge ${h.css}">${h.badge}</span>
+      <span>${h.title}</span>
+    </div>`).join('');
+}
+async function reshuffleNews(){ S.newstickerDeck=shuffle([...NEWSTICKER]); await fbUpdate('game/state',{newstickerDeck:S.newstickerDeck}); logSys('Newsticker neu gemischt.'); }
+
+// GROUPS
+function renderGroups(){
+  const el=document.getElementById('d-groups-grid');
+  if(!el) return;
+  if(!S.groups.length){el.innerHTML='<div style="color:var(--muted2);font-size:11px">Keine Gruppen</div>';return;}
+  el.innerHTML=S.groups.map(g=>{
+    const val=g.buildings.length*15+g.reputation+g.gc;
+    const tags=g.buildings.slice(0,4).map(b=>{
+      const f=b.heat==='Erdgas'||b.heat==='Heizöl';
+      return `<span class="btag ${f?'fossil':'green'}" onclick="showBldgDetail(${b.nr})">#${b.nr}</span>`;
+    }).join('');
+    return `<div class="gcard">
+      <div class="gcard-top">
+        <div class="gcard-name"><span style="width:8px;height:8px;border-radius:50%;background:${g.color};display:inline-block;flex-shrink:0"></span>${g.name}</div>
+        <div class="gcard-total">${val} GC</div>
+      </div>
+      <div class="gcard-stats">
+        <div class="gstat"><div class="gstat-v" style="color:var(--yellow)">${g.gc}</div><div class="gstat-l">Liquid.</div></div>
+        <div class="gstat"><div class="gstat-v">${g.buildings.length}</div><div class="gstat-l">Gebäude</div></div>
+        <div class="gstat"><div class="gstat-v" style="color:var(--blue)">${g.reputation}</div><div class="gstat-l">Rep.</div></div>
+      </div>
+      <div>${tags||'<span style="color:var(--muted2);font-size:9px">Keine Gebäude</span>'}</div>
+    </div>`;
+  }).join('');
+}
+
+function openAddGroupModal(){ document.getElementById('m-addgrp').classList.add('open'); }
+async function addGroupInGame(){
+  const n=document.getElementById('ag-name').value.trim(); if(!n) return;
+  const gc=parseInt(document.getElementById('ag-gc').value)||10;
+  const col=GRP_COLORS[S.groups.length%GRP_COLORS.length];
+  S.groups.push({id:'g'+Date.now(),name:n,gc,color:col,reputation:0,buildings:[],esg:[],credits:0,totalCO2:0,ready:false,profile:''});
+  closeModal('m-addgrp');
+  document.getElementById('ag-name').value='';
+  await fbSet('game/state',S);
+  renderGroups(); updateCO2Forms();
+  logSys(`Gruppe „${n}" hinzugefügt.`);
+}
+
+// MARKET
+function buildMarket(){
+  const n=Math.min(S.groups.length, _marketPool.length);
+  const cards=_marketPool.splice(0,n);
+  return cards.map(b=>({building:b,sold:false,buyer:null,price:null}));
+}
+
+function renderMarket(){
+  const el=document.getElementById('d-market-grid'); if(!el) return;
+  if(!S.market||!S.market.length){el.innerHTML='<div style="color:var(--muted2)">Kein Markt – neu aufdecken</div>';return;}
+  el.innerHTML=S.market.map((item,i)=>{
+    const b=item.building; if(!b) return '';
+    const f=b.heat==='Erdgas'||b.heat==='Heizöl';
+    const ec=b.energy>170?'var(--red)':b.energy>130?'var(--orange)':'var(--green)';
+    if(item.sold) return `<div class="mcard sold"><div class="mcard-nr">#${b.nr}</div><div class="mcard-name">${b.name}</div><div style="font-size:9px;color:var(--green);margin-top:6px">✓ ${item.buyer} · ${item.price} GC</div></div>`;
+    return `<div class="mcard ${f?'fossil':'green'}">
+      <div class="mcard-nr">#${b.nr} · Reg.${b.reg} · ${b.year}</div>
+      <div class="mcard-name">${b.name}</div>
+      <div class="mcard-addr">${b.addr}</div>
+      <div class="mcard-stats">
+        <div class="mstat"><div class="mstat-v" style="color:${ec}">${b.energy}</div><div class="mstat-l">kWh/m²</div></div>
+        <div class="mstat"><div class="mstat-v" style="color:${f?'var(--orange)':'var(--green)'}">${b.heat.slice(0,8)}</div><div class="mstat-l">Heizung</div></div>
+        <div class="mstat"><div class="mstat-v">${b.co2}</div><div class="mstat-l">kg CO₂</div></div>
+        <div class="mstat"><div class="mstat-v">${(b.area/1000).toFixed(1)}k</div><div class="mstat-l">m²</div></div>
+      </div>
+      <div class="mcard-feat">${b.feat}</div>
+      <div class="mcard-foot">
+        <span style="font-size:12px;color:var(--yellow)">min. 20 GC</span>
+        <button class="btn btn-sm btn-primary" onclick="openBidModal(${i})">Kaufen →</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function refreshMarket(){
+  S.market.filter(m=>!m.sold&&m.building).forEach(m=>_marketPool.push(m.building));
+  S.market=buildMarket();
+  renderMarket();
+  await fbSet('game/state',S);
+}
+
+let _bidIdx=-1;
+function openBidModal(idx){
+  _bidIdx=idx;
+  const item=S.market[idx]; if(!item||item.sold) return;
+  const b=item.building;
+  document.getElementById('m-bid-title').textContent=b.name;
+  document.getElementById('m-bid-sub').textContent=`${b.addr} · ${b.energy} kWh/m² · ${b.heat}`;
+  const sel=document.getElementById('bid-grp');
+  sel.innerHTML='<option value="">— Gruppe —</option>'+S.groups.map(g=>`<option value="${g.id}">${g.name} (${g.gc} GC)</option>`).join('');
+  document.getElementById('bid-price').value=20;
+  document.getElementById('m-bid').classList.add('open');
+}
+
+async function executeBid(){
+  const gid=document.getElementById('bid-grp').value;
+  const price=parseInt(document.getElementById('bid-price').value)||20;
+  if(!gid||price<20){alert('Gruppe wählen und Preis ≥ 20 GC');return;}
+  const g=S.groups.find(x=>x.id===gid);
+  const item=S.market[_bidIdx];
+  if(!g||!item) return;
+  g.gc-=price;
+  g.buildings.push(item.building);
+  item.sold=true; item.buyer=g.name; item.price=price;
+  closeModal('m-bid');
+  _salesLogArr.unshift({rnd:S.round,text:`${g.name} kauft #${item.building.nr} „${item.building.name}" — ${price} GC`});
+  renderMarket(); renderGroups(); renderSalesLog();
+  await fbSet('game/state',S);
+  logSys(`${g.name} kauft #${item.building.nr} „${item.building.name}" für ${price} GC`);
+}
+
+function renderSalesLog(){
+  const el=document.getElementById('d-sales-log'); if(!el) return;
+  el.innerHTML=_salesLogArr.length?_salesLogArr.slice(0,8).map(s=>`
+    <div class="sale-row"><span style="font-size:9px;color:var(--muted2);flex-shrink:0">Rd.${s.rnd}</span>${s.text}</div>`).join('')
+    :'<div style="color:var(--muted2);font-size:11px;padding:6px">Noch keine Verkäufe</div>';
+}
+
+function openSellModal(){
+  const sel=document.getElementById('sell-grp');
+  sel.innerHTML='<option value="">—</option>'+S.groups.map(g=>`<option value="${g.id}">${g.name}</option>`).join('');
+  document.getElementById('sell-bldg').innerHTML='<option value="">—</option>';
+  document.getElementById('sell-price-box').style.display='none';
+  document.getElementById('sell-capex').value=0;
+  document.getElementById('sell-upg').value='none';
+  document.getElementById('sell-sp').value=0;
+  document.getElementById('m-sell').classList.add('open');
+}
+
+function updateSellBldgs(){
+  const g=S.groups.find(x=>x.id===document.getElementById('sell-grp').value);
+  const sel=document.getElementById('sell-bldg');
+  sel.innerHTML='<option value="">—</option>'+(g?g.buildings.map(b=>`<option value="${b.nr}">#${b.nr} ${b.name}</option>`).join(''):'');
+  updateSellPrice();
+}
+
+function updateSellPrice(){
+  const bNr=parseInt(document.getElementById('sell-bldg').value);
+  if(!bNr){document.getElementById('sell-price-box').style.display='none';return;}
+  const cap=Math.min(3,parseInt(document.getElementById('sell-capex').value)||0);
+  const upg=document.getElementById('sell-upg').value;
+  const sp=parseInt(document.getElementById('sell-sp').value)||0;
+  const cfg=S.settings;
+  const base=cfg.p_s_base||15;
+  let bonus=0,note=`Basis: ${base} GC`;
+  if(upg==='redev'){bonus=cfg.p_s_redev||10;note+=` + Redev: +${bonus}`;}
+  else if(upg==='neubau'){bonus=cfg.p_s_neubau||20;note+=` + Neubau: +${bonus}`;}
+  else{bonus=cap*(cfg.p_s_capex||3);note+=` + ${cap}×Capex: +${bonus}`;}
+  const zk=upg!=='none'||cap>=3;
+  const tb=zk?(cfg.p_trans||8):0;
+  if(zk) note+=` + Transition: +${tb}`;
+  if(sp>0) note+=` − ${sp} SP`;
+  const total=Math.max(0,base+bonus+tb-sp);
+  document.getElementById('sp-base').textContent=base;
+  document.getElementById('sp-bonus').textContent=`+${bonus+tb}`;
+  document.getElementById('sp-total').textContent=total;
+  document.getElementById('sp-total').style.color=total>20?'var(--green)':'var(--yellow)';
+  document.getElementById('sp-note').textContent=note;
+  document.getElementById('sell-price-box').style.display='block';
+}
+
+async function executeSell(){
+  const gid=document.getElementById('sell-grp').value;
+  const bNr=parseInt(document.getElementById('sell-bldg').value);
+  if(!gid||!bNr){alert('Gruppe und Gebäude wählen');return;}
+  const g=S.groups.find(x=>x.id===gid);
+  const b=BUILDINGS.find(x=>x.nr===bNr);
+  if(!g||!b) return;
+  const cap=Math.min(3,parseInt(document.getElementById('sell-capex').value)||0);
+  const upg=document.getElementById('sell-upg').value;
+  const sp=parseInt(document.getElementById('sell-sp').value)||0;
+  const cfg=S.settings;
+  const base=cfg.p_s_base||15;
+  let bonus=upg==='redev'?(cfg.p_s_redev||10):upg==='neubau'?(cfg.p_s_neubau||20):cap*(cfg.p_s_capex||3);
+  const zk=upg!=='none'||cap>=3;
+  const tb=zk?(cfg.p_trans||8):0;
+  const price=Math.max(0,base+bonus+tb-sp);
+  g.gc+=price;
+  g.buildings=g.buildings.filter(x=>x.nr!==bNr);
+  _marketPool.push(b);
+  closeModal('m-sell');
+  _salesLogArr.unshift({rnd:S.round,text:`${g.name} verkauft #${b.nr} „${b.name}" → ${price} GC`});
+  renderGroups(); renderSalesLog();
+  await fbSet('game/state',S);
+  logSys(`${g.name} verkauft #${b.nr} für ${price} GC`);
+}
+
+// BUILDINGS
+let _filtB=[...BUILDINGS];
+function filterBldgs(q){ const ql=q.toLowerCase(); _filtB=BUILDINGS.filter(b=>!q||b.name.toLowerCase().includes(ql)||b.addr.toLowerCase().includes(ql)||b.heat.toLowerCase().includes(ql)||b.feat.toLowerCase().includes(ql)); renderBuildings(); }
+function fp(type){
+  document.querySelectorAll('.fpill').forEach(p=>p.classList.remove('on')); event.target.classList.add('on');
+  if(!type) _filtB=[...BUILDINGS];
+  else if(type==='fossil') _filtB=BUILDINGS.filter(b=>b.heat==='Erdgas'||b.heat==='Heizöl');
+  else if(type==='fw') _filtB=BUILDINGS.filter(b=>b.heat==='Fernwärme');
+  else if(type==='wp') _filtB=BUILDINGS.filter(b=>b.heat==='Wärmepumpe');
+  else if(type==='denkmal') _filtB=BUILDINGS.filter(b=>b.feat.includes('Denkmal'));
+  else if(type==='hochhaus') _filtB=BUILDINGS.filter(b=>b.feat.includes('Hochhaus'));
+  renderBuildings();
+}
+function fpE(thresh){ _filtB=BUILDINGS.filter(b=>b.energy>thresh); renderBuildings(); }
+
+function renderBuildings(){
+  const el=document.getElementById('d-bldg-grid'); if(!el) return;
+  el.innerHTML=_filtB.map(b=>{
+    const f=b.heat==='Erdgas'||b.heat==='Heizöl', hp=b.heat==='Wärmepumpe';
+    const ec=b.energy>170?'ecrit':b.energy>130?'ewarn':'';
+    return `<div class="bcard ${f?'fossil':hp?'hp':'grn'}" onclick="showBldgDetail(${b.nr})">
+      <div class="bc-nr">#${b.nr}·Reg.${b.reg}·${b.year}</div>
+      <div class="bc-name">${b.name}</div>
+      <div class="bc-addr">${b.addr}</div>
+      <div class="bc-chips">
+        <span class="bchip ${ec}">${b.energy}kWh</span>
+        <span class="bchip ${f?'fos':hp?'':'grn'}">${b.heat.slice(0,8)}</span>
+        <span class="bchip">${b.co2}kg</span>
+      </div>
+      <div class="bc-feat">${b.feat}</div>
+    </div>`;
+  }).join('');
+}
+
+function showBldgDetail(nr){
+  const b=BUILDINGS.find(x=>x.nr===nr); if(!b) return;
+  const f=b.heat==='Erdgas'||b.heat==='Heizöl';
+  const assign=S.groups.map(g=>`<button class="btn btn-sm btn-primary" onclick="assignBldg('${g.id}',${b.nr})">→ ${g.name}</button>`).join('');
+  document.getElementById('m-bldg-body').innerHTML=`
+    <div style="font-size:9px;color:var(--muted);margin-bottom:4px">#${b.nr} · Region ${b.reg} · ${b.year}</div>
+    <div class="modal-title">${b.name}</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:12px">${b.addr}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px">
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:9px;text-align:center">
+        <div style="font-size:18px;font-weight:500;color:${b.energy>170?'var(--red)':b.energy>130?'var(--orange)':'var(--green)'}">${b.energy}</div>
+        <div style="font-size:9px;color:var(--muted)">kWh/m²</div></div>
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:9px;text-align:center">
+        <div style="font-size:16px;font-weight:500;color:${f?'var(--orange)':'var(--green)'}">${b.heat}</div>
+        <div style="font-size:9px;color:var(--muted)">Heizsystem</div></div>
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:9px;text-align:center">
+        <div style="font-size:16px;font-weight:500">${b.area.toLocaleString('de')}</div>
+        <div style="font-size:9px;color:var(--muted)">m²</div></div>
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:9px;text-align:center">
+        <div style="font-size:16px;font-weight:500">${b.co2}</div>
+        <div style="font-size:9px;color:var(--muted)">kgCO₂/m²</div></div>
+    </div>
+    <div style="font-size:10px;color:var(--muted);margin-bottom:12px">${b.feat}</div>
+    ${assign?`<div style="font-size:9px;color:var(--muted);margin-bottom:7px">Portfolio zuweisen:</div><div style="display:flex;gap:5px;flex-wrap:wrap">${assign}</div>`:''}`;
+  document.getElementById('m-bldg').classList.add('open');
+}
+
+async function assignBldg(gid,bnr){
+  const g=S.groups.find(x=>x.id===gid), b=BUILDINGS.find(x=>x.nr===bnr);
+  if(!g||!b) return;
+  if(g.buildings.find(x=>x.nr===bnr)){logSys(`#${bnr} bereits in ${g.name}`);return;}
+  g.buildings.push(b);
+  closeModal('m-bldg');
+  await fbSet('game/state',S);
+  renderGroups(); updateCO2Forms();
+  logSys(`${g.name} erhält #${bnr} ${b.name}`);
+}
+
+// CO2
+function updateCO2Forms(){
+  const el=document.getElementById('d-co2-forms'); if(!el) return;
+  if(!S.groups.length){el.innerHTML='<div style="color:var(--muted2)">Gruppen anlegen</div>';return;}
+  const rc=S.settings.p_redev_co2||7, nc=S.settings.p_neubau_co2||36;
+  const bc=S.settings.p_betrieb_co2||1, fc=S.settings.p_fossil_co2||1;
+  el.innerHTML=S.groups.map(g=>{
+    const bet=g.buildings.length, fos=g.buildings.filter(b=>b.heat==='Erdgas'||b.heat==='Heizöl').length;
+    return `<div class="co2-gblock">
+      <div class="co2-gname"><span style="width:8px;height:8px;border-radius:50%;background:${g.color};display:inline-block;flex-shrink:0"></span>${g.name}</div>
+      <div class="co2-fields">
+        <div class="co2-field"><label>Betrieb (+${bc})</label><input type="number" id="cf_${g.id}_b" value="${bet}" min="0" oninput="updateCO2Summary()"></div>
+        <div class="co2-field"><label>Fossile (+${fc})</label><input type="number" id="cf_${g.id}_f" value="${fos}" min="0" oninput="updateCO2Summary()"></div>
+        <div class="co2-field"><label>Capex CO₂</label><input type="number" id="cf_${g.id}_c" value="0" min="0" oninput="updateCO2Summary()"></div>
+        <div class="co2-field"><label>Redev. (×${rc})</label><input type="number" id="cf_${g.id}_r" value="0" min="0" oninput="updateCO2Summary()"></div>
+        <div class="co2-field"><label>Neubau (×${nc})</label><input type="number" id="cf_${g.id}_n" value="0" min="0" oninput="updateCO2Summary()"></div>
+        <div class="co2-field"><label>Ausgleich (−)</label><input type="number" id="cf_${g.id}_o" value="0" min="0" oninput="updateCO2Summary()"></div>
+      </div>
+      <div class="co2-gtotal"><span style="color:var(--muted)">Gruppe CO₂</span><span id="cf_${g.id}_tot" style="color:var(--red)">0</span></div>
+    </div>`;
+  }).join('');
+  updateCO2Summary();
+}
+
+function updateCO2Summary(){
+  const rc=S.settings.p_redev_co2||7,nc=S.settings.p_neubau_co2||36;
+  const bc=S.settings.p_betrieb_co2||1,fc=S.settings.p_fossil_co2||1;
+  let total=0;
+  S.groups.forEach(g=>{
+    const b=(parseInt(document.getElementById(`cf_${g.id}_b`)?.value)||0)*bc;
+    const f=(parseInt(document.getElementById(`cf_${g.id}_f`)?.value)||0)*fc;
+    const c=parseInt(document.getElementById(`cf_${g.id}_c`)?.value)||0;
+    const r=(parseInt(document.getElementById(`cf_${g.id}_r`)?.value)||0)*rc;
+    const n=(parseInt(document.getElementById(`cf_${g.id}_n`)?.value)||0)*nc;
+    const o=parseInt(document.getElementById(`cf_${g.id}_o`)?.value)||0;
+    const gt=b+f+c+r+n-o;
+    const tel=document.getElementById(`cf_${g.id}_tot`);
+    if(tel){tel.textContent=gt+' CO₂';tel.style.color=gt>0?'var(--red)':'var(--green)';}
+    total+=gt;
+  });
+  const after=S.co2Budget-total;
+  const pg=Math.round(after/Math.max(1,S.groups.length));
+  const nr=TEMP_TABLE.find(r=>r.budget<=pg)||TEMP_TABLE[TEMP_TABLE.length-1];
+  const ts='+'+( nr.t/10).toFixed(1)+'°C';
+  document.getElementById('cs-total').textContent=total;
+  document.getElementById('cs-after').textContent=after;
+  document.getElementById('cs-after').style.color=after<0?'var(--red)':after<S.co2PerGroup?'var(--orange)':'var(--green)';
+  document.getElementById('cs-temp').textContent=ts;
+  document.getElementById('cs-temp').style.color=getTCol(nr.t);
+}
+
+async function bookRoundCO2(){
+  const rc=S.settings.p_redev_co2||7,nc=S.settings.p_neubau_co2||36;
+  const bc=S.settings.p_betrieb_co2||1,fc=S.settings.p_fossil_co2||1;
+  let total=0;
+  S.groups.forEach(g=>{
+    const b=(parseInt(document.getElementById(`cf_${g.id}_b`)?.value)||0)*bc;
+    const f=(parseInt(document.getElementById(`cf_${g.id}_f`)?.value)||0)*fc;
+    const c=parseInt(document.getElementById(`cf_${g.id}_c`)?.value)||0;
+    const r=(parseInt(document.getElementById(`cf_${g.id}_r`)?.value)||0)*rc;
+    const n=(parseInt(document.getElementById(`cf_${g.id}_n`)?.value)||0)*nc;
+    const o=parseInt(document.getElementById(`cf_${g.id}_o`)?.value)||0;
+    const gt=b+f+c+r+n-o;
+    g.totalCO2+=gt; total+=gt;
+  });
+  S.co2Budget-=total;
+  const pg=Math.round(S.co2Budget/Math.max(1,S.groups.length));
+  const nr=TEMP_TABLE.find(r=>r.budget<=pg)||TEMP_TABLE[TEMP_TABLE.length-1];
+  S.tempSlider=nr.t;
+  document.getElementById('d-slider').value=nr.t;
+  renderThermo(); renderEffects(); updateKlimaBtn(); renderTicker();
+  await fbSet('game/state',S);
+  logEvent('co2',`Runde ${S.round}: ${total} CO₂ → Budget ${S.co2Budget} → +${(nr.t/10).toFixed(1)}°C`);
+}
+
+function qTotal(){
+  const b=parseInt(document.getElementById('qc_bet').value)||0;
+  const f=parseInt(document.getElementById('qc_fos').value)||0;
+  const c=parseInt(document.getElementById('qc_cap').value)||0;
+  const r=(parseInt(document.getElementById('qc_red').value)||0)*(S.settings.p_redev_co2||7);
+  const n=(parseInt(document.getElementById('qc_neu').value)||0)*(S.settings.p_neubau_co2||36);
+  const o=parseInt(document.getElementById('qc_off').value)||0;
+  const tot=b+f+c+r+n-o;
+  const el=document.getElementById('qc-tot');
+  if(el){el.textContent=tot+' CO₂';el.style.color=tot>0?'var(--red)':'var(--green)';}
+}
+
+async function quickBook(){
+  const b=parseInt(document.getElementById('qc_bet').value)||0;
+  const f=parseInt(document.getElementById('qc_fos').value)||0;
+  const c=parseInt(document.getElementById('qc_cap').value)||0;
+  const r=(parseInt(document.getElementById('qc_red').value)||0)*(S.settings.p_redev_co2||7);
+  const n=(parseInt(document.getElementById('qc_neu').value)||0)*(S.settings.p_neubau_co2||36);
+  const o=parseInt(document.getElementById('qc_off').value)||0;
+  const tot=b+f+c+r+n-o;
+  S.co2Budget-=tot;
+  const pg=Math.round(S.co2Budget/Math.max(1,S.groups.length));
+  const nr=TEMP_TABLE.find(r2=>r2.budget<=pg)||TEMP_TABLE[TEMP_TABLE.length-1];
+  S.tempSlider=nr.t;
+  document.getElementById('d-slider').value=nr.t;
+  renderThermo(); renderEffects(); updateKlimaBtn(); renderTicker();
+  ['qc_bet','qc_fos','qc_cap','qc_red','qc_neu','qc_off'].forEach(id=>{const e=document.getElementById(id);if(e)e.value=0;});
+  qTotal();
+  await fbSet('game/state',S);
+  logEvent('co2',`Schnell: ${tot} CO₂ → Budget ${S.co2Budget}`);
+}
+
+// LOG
+function logEvent(type,msg){
+  const el=document.getElementById('d-elog'); if(!el) return;
+  const t=new Date().toLocaleTimeString('de',{hour:'2-digit',minute:'2-digit'});
+  const labels={news:'Newsticker',klima:'Klimakarte',co2:'CO₂',sys:'System'};
+  const div=document.createElement('div'); div.className='eentry';
+  div.innerHTML=`<div class="etype ${type}">${labels[type]||type}</div>${msg}<div class="etime">${t} · Rd.${S.round}</div>`;
+  el.insertBefore(div,el.firstChild);
+}
+function logSys(m){ logEvent('sys',m); }
+
+// TABS
+function ctab(n,el){
+  document.querySelectorAll('.ctab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.ctab-body').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('ctab-'+n).classList.add('active');
+}
+function goSettings(){ show('onboarding'); initOnboarding(); }
+
+// ═══════════════════════════════════
+// GROUP VIEW
+// ═══════════════════════════════════
+function renderJoinScreen(){
+  const el=document.getElementById('join-groups-list');
+  el.innerHTML=S.groups.map(g=>`
+    <div class="join-group-btn" onclick="joinGroup('${g.id}')">
+      <div class="jdot" style="background:${g.color}"></div>
+      <div class="jname">${g.name}</div>
+      <div class="jgc">${g.gc} GC</div>
+    </div>`).join('');
+}
+
+function joinGroup(gid){
+  myGroupId=gid;
+  show('group');
+  renderGroupView();
+}
+
+function listenAsGroup(){
+  fbListen('game/state', state=>{
+    if(!state) return;
+    S={...S,...state};
+    if(myGroupId) renderGroupView();
+  });
+}
+
+function renderGroupView(){
+  const g=S.groups.find(x=>x.id===myGroupId); if(!g) return;
+  document.getElementById('gv-name').textContent=g.name;
+  document.getElementById('gv-gc').textContent=g.gc+' GC';
+  document.getElementById('gv-rep').textContent=g.reputation+' Reputation';
+
+  // Phase indicator
+  const ph=PHASES[S.phase-1];
+  document.getElementById('gv-phase-label').textContent=`${ph.n} – ${ph.lbl}`;
+  document.getElementById('gv-phase-desc').textContent=ph.desc;
+
+  // Thermo mini
+  const pct=((S.tempSlider-10)/20)*100;
+  const col=getTCol(S.tempSlider);
+  document.getElementById('gv-thermo-fill').style.height=pct+'%';
+  document.getElementById('gv-thermo-fill').style.background=col;
+  document.getElementById('gv-temp').textContent='+'+( S.tempSlider/10).toFixed(1)+'°C';
+  document.getElementById('gv-temp').style.color=col;
+  document.getElementById('gv-co2-lbl').textContent=`CO₂-Budget: ${S.co2Budget}`;
+  document.getElementById('gv-year-lbl').textContent=`Jahr ${S.year} · Runde ${S.round}`;
+
+  // Current card
+  if(S.currentCard){
+    const cc=document.getElementById('gv-cur-card');
+    cc.style.display='block';
+    cc.className=`gv-card ${S.currentCard.css||'news'}`;
+    document.getElementById('gv-card-badge').textContent=S.currentCard.badge||'Newsticker';
+    document.getElementById('gv-card-title').textContent=S.currentCard.t;
+    document.getElementById('gv-card-text').textContent=S.currentCard.x;
+  }
+
+  // Phase actions
+  renderGroupPhaseActions(g);
+
+  // Portfolio
+  const port=document.getElementById('gv-portfolio');
+  port.innerHTML=g.buildings.length?g.buildings.map(b=>{
+    const f=b.heat==='Erdgas'||b.heat==='Heizöl';
+    const ec=b.energy>170?'ecrit':'';
+    return `<div class="gv-bldg ${f?'fossil':'green'}">
+      <div class="gv-bldg-name">#${b.nr} ${b.name}</div>
+      <div class="gv-bldg-sub">${b.addr}</div>
+      <div class="gv-bldg-chips">
+        <span class="gv-chip ${ec}">${b.energy} kWh/m²</span>
+        <span class="gv-chip ${f?'fos':'grn'}">${b.heat}</span>
+        <span class="gv-chip">${b.co2} kg CO₂/m²</span>
+      </div>
+    </div>`;
+  }).join(''):'<div style="color:var(--muted2);font-size:11px">Keine Gebäude</div>';
+
+  // Ready button
+  const rbtn=document.getElementById('gv-ready-btn');
+  rbtn.className='ready-btn'+(g.ready?' is-ready':'');
+  rbtn.textContent=g.ready?'✓ Bereit gemeldet – warte auf Spielleiter':'✓ Fertig für nächste Phase';
+}
+
+function renderGroupPhaseActions(g){
+  const el=document.getElementById('gv-phase-actions');
+  const title=document.getElementById('gv-actions-title');
+  title.textContent=`Phase ${S.phase} – Aktionen`;
+
+  const phaseActions={
+    1:`<div class="gv-action-box">
+      <div class="gv-action-title">📰 Newsticker & Klimakarten</div>
+      <div style="font-size:11px;color:var(--muted)">Der Spielleiter zieht die Karten. Effekte gelten für alle Gruppen. Sieh die Karte oben.</div>
+    </div>`,
+    2:`<div class="gv-action-box">
+      <div class="gv-action-title">💰 Einnahmen & Zinsen</div>
+      <div class="gv-stat-row">
+        <div class="gv-stat"><div class="gv-stat-v">${g.buildings.length}</div><div class="gv-stat-l">Gebäude</div></div>
+        <div class="gv-stat"><div class="gv-stat-v" style="color:var(--green)">+${g.buildings.length} GC</div><div class="gv-stat-l">Mieteinnahmen</div></div>
+        <div class="gv-stat"><div class="gv-stat-v" style="color:var(--yellow)">${g.gc} GC</div><div class="gv-stat-l">aktuell</div></div>
+      </div>
+      <div style="font-size:10px;color:var(--muted)">Zukunftssichere Gebäude (3+ Capex, Redev., Neubau) bringen +1 GC extra.</div>
+    </div>`,
+    3:`<div class="gv-action-box">
+      <div class="gv-action-title">🏢 Transaktionen</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px">Schau auf den Spielleiter-Screen für den aktuellen Markt. Teile dem Spielleiter dein Gebot mit.</div>
+      ${S.market&&S.market.length?'<div style="font-size:10px;color:var(--muted2)">Aktuelle Marktgebäude:<br>'+S.market.filter(m=>!m.sold).map(m=>m.building?`#${m.building.nr} ${m.building.name} (${m.building.energy} kWh, ${m.building.heat})`:'').join('<br>')+'</div>':'<div style="font-size:10px;color:var(--muted2)">Kein Markt aktiv</div>'}
+    </div>`,
+    4:`<div class="gv-action-box">
+      <div class="gv-action-title">🏗 Baumaßnahmen planen</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Teile dem Spielleiter mit was du baust.</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:10px">
+        <div style="background:var(--surface);border-radius:4px;padding:8px"><strong>Capex</strong><br><span style="color:var(--muted)">${S.settings.capex||3} GC · sofort</span></div>
+        <div style="background:var(--surface);border-radius:4px;padding:8px"><strong>Redevelopment</strong><br><span style="color:var(--muted)">${S.settings.redev||10} GC · 1 Runde</span></div>
+        <div style="background:var(--surface);border-radius:4px;padding:8px"><strong>Abriss & Neubau</strong><br><span style="color:var(--muted)">${S.settings.neubau||20} GC · 2 Runden</span></div>
+        <div style="background:var(--surface);border-radius:4px;padding:8px"><strong>Mein Budget</strong><br><span style="color:var(--yellow)">${g.gc} GC verfügbar</span></div>
+      </div>
+    </div>`,
+    5:`<div class="gv-action-box">
+      <div class="gv-action-title">⚡ Weitere Aktionen</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:10px">
+        <div style="background:var(--surface);border-radius:4px;padding:8px"><strong>ESG-Strategie</strong><br><span style="color:var(--muted)">1 GC aufdecken + 2 GC umsetzen</span></div>
+        <div style="background:var(--surface);border-radius:4px;padding:8px"><strong>Marketing</strong><br><span style="color:var(--muted)">1 GC = +1 Reputation</span></div>
+        <div style="background:var(--surface);border-radius:4px;padding:8px"><strong>Schaden reparieren</strong><br><span style="color:var(--muted)">1 GC = 1 SP</span></div>
+        <div style="background:var(--surface);border-radius:4px;padding:8px"><strong>CO₂ ausgleichen</strong><br><span style="color:var(--muted)">${TEMP_TABLE.find(r=>r.t===S.tempSlider)?.co2price||1} GC je CO₂</span></div>
+      </div>
+      <div style="font-size:10px;color:var(--yellow);margin-top:8px">Verfügbar: ${g.gc} GC</div>
+    </div>`,
+    6:`<div class="gv-action-box">
+      <div class="gv-action-title">🌡 CO₂-Budget Abrechnung</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Der Spielleiter bucht alle CO₂-Emissionen.</div>
+      <div class="gv-stat-row">
+        <div class="gv-stat"><div class="gv-stat-v" style="color:var(--red)">${g.totalCO2||0}</div><div class="gv-stat-l">CO₂ gesamt</div></div>
+        <div class="gv-stat"><div class="gv-stat-v">${S.co2Budget}</div><div class="gv-stat-l">Budget noch</div></div>
+        <div class="gv-stat"><div class="gv-stat-v" style="color:${getTCol(S.tempSlider)}">+${(S.tempSlider/10).toFixed(1)}°C</div><div class="gv-stat-l">Temperatur</div></div>
+      </div>
+    </div>`
+  };
+  el.innerHTML=phaseActions[S.phase]||'';
+}
+
+async function toggleReady(){
+  const g=S.groups.find(x=>x.id===myGroupId); if(!g) return;
+  g.ready=!g.ready;
+  await fbSet('game/state',S);
+  renderGroupView();
+}
+
+// ═══════════════════════════════════
+// UTILS
+// ═══════════════════════════════════
+function shuffle(arr){ for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];}return arr; }
+function closeModal(id){ document.getElementById(id)?.classList.remove('open'); }
+document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open');}));
+
+// ── START ──
+init();
+</script>
+</body>
+</html>
